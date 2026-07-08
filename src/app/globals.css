@@ -98,3 +98,89 @@ select {
   padding: 10px 0;
   border-bottom: 1px solid #edf0f5;
 }
+
+.student-layout {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  background: #f6f7f9;
+}
+
+.group-sidebar {
+  border-right: 1px solid #e5e7eb;
+  background: #fff;
+  padding: 20px;
+}
+
+.student-content {
+  min-width: 0;
+  padding: 20px;
+}
+
+.study-card {
+  background: #fff;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.study-card h2,
+.study-card p {
+  margin: 0;
+}
+
+.study-card button {
+  border: 1px solid #d7dce5;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    overflow: hidden;
+  }
+
+  .student-layout {
+    height: 100dvh;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 60px;
+  }
+
+  .group-sidebar {
+    display: none;
+  }
+
+  .student-content {
+    min-height: 0;
+    overflow: hidden;
+    display: grid;
+    align-content: center;
+  }
+
+  .exam-scroll .student-content {
+    overflow: auto;
+    align-content: start;
+  }
+
+  .bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid #e5e7eb;
+    background: #fff;
+  }
+
+  .bottom-nav a {
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+  }
+}
