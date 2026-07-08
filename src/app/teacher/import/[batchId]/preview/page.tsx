@@ -1,5 +1,5 @@
 import type { TermDraft } from "@/lib/types";
-import { getPreviewRows } from "../../actions";
+import { confirmImportAction, getPreviewRows } from "../../actions";
 
 export default async function ImportPreviewPage({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params;
@@ -17,6 +17,10 @@ export default async function ImportPreviewPage({ params }: { params: Promise<{ 
           </article>
         ))}
       </div>
+      <form action={confirmImportAction} className="confirm-bar">
+        <input type="hidden" name="batchId" value={batchId} />
+        <button type="submit">确认导入</button>
+      </form>
     </main>
   );
 }
