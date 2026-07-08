@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  parentId  String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent    Group?      @relation("GroupHierarchy", fields: [parentId], references: [id])
+  children  Group[]     @relation("GroupHierarchy")
+  termLinks TermGroup[]
+
+  @@unique([name, parentId])
+}
+
+model Term {
+  id             String   @id @default(cuid())
+  text           String
+  normalizedText String
+  termType       String
+  createdSource  String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  groups   TermGroup[]
+  meanings TermMeaning[]
+
+  @@unique([normalizedText, termType])
+}
+
+model TermGroup {
+  termId  String
+  groupId String
+
+  term  Term  @relation(fields: [termId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([termId, groupId])
+}
+
+model TermMeaning {
+  id               String   @id @default(cuid())
+  termId           String
+  partOfSpeech     String?
+  chineseMeaning   String
+  exampleSentence  String?
+  explanation      String?
+  usageContext     String?
+  fieldSourcesJson String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  term Term @relation(fields: [termId], references: [id], onDelete: Cascade)
+}
+
+model ImportBatch {
+  id            String    @id @default(cuid())
+  sourceType    String
+  fileName      String?
+  targetGroupId String
+  status        String
+  createdAt     DateTime  @default(now())
+  confirmedAt   DateTime?
+
+  rows ImportRow[]
+}
+
+model ImportRow {
+  id               String   @id @default(cuid())
+  batchId          String
+  rowIndex         Int
+  rawText          String
+  parsedJson       String
+  enrichedJson     String
+  duplicateStatus  String
+  validationStatus String
+  createdAt        DateTime @default(now())
+
+  batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+}
+
+model ExamSession {
+  id                   String   @id @default(cuid())
+  selectedGroupIdsJson String
+  questionCount        Int
+  score                Int
+  correctCount         Int
+  startedAt            DateTime
+  submittedAt          DateTime
+
+  answers ExamAnswer[]
+}
+
+model ExamAnswer {
+  id               String  @id @default(cuid())
+  examSessionId    String
+  questionIndex    Int
+  questionType     String
+  prompt           String
+  optionsJson      String
+  correctOptionId  String
+  selectedOptionId String?
+  isCorrect        Boolean
+  explanation      String
+  termSnapshotJson String
+
+  session ExamSession @relation(fields: [examSessionId], references: [id], onDelete: Cascade)
+}
