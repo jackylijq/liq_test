@@ -9,8 +9,8 @@ export default async function ImportPreviewPage({ params }: { params: Promise<{ 
     <main className="page">
       <h1>导入预览</h1>
       <div className="table">
-        {rows.map((row) => (
-          <article className="row" key={row.text}>
+        {rows.map((row, index) => (
+          <article className="row" key={`${row.text}-${index}`}>
             <strong>{row.text}</strong>
             <span>{row.termType === "phrase" ? "短语" : "单词"}</span>
             <span>{row.meanings[0]?.chineseMeaning}</span>
