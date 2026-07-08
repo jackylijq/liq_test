@@ -1,0 +1,64 @@
+import type { TermDraft } from "@/lib/types";
+
+export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
+  if (draft.termType === "phrase") {
+    return {
+      ...draft,
+      phoneticSymbol: undefined,
+      meanings: draft.meanings.length
+        ? draft.meanings.map((meaning) => ({
+            ...meaning,
+            partOfSpeech: undefined,
+            usageContext: meaning.usageContext ?? `常用场景：${draft.text} 常用于日常交流和课文表达中。`,
+            fieldSources: {
+              ...meaning.fieldSources,
+              usageContext: meaning.fieldSources.usageContext ?? "mock_generated",
+            },
+          }))
+        : [
+            {
+              chineseMeaning: `${draft.text} 的中文意思`,
+              exampleSentence: `Please use "${draft.text}" in a simple sentence.`,
+              usageContext: `常用场景：${draft.text} 常用于日常交流和课文表达中。`,
+              fieldSources: {
+                chineseMeaning: "mock_generated",
+                exampleSentence: "mock_generated",
+                usageContext: "mock_generated",
+              },
+            },
+          ],
+    };
+  }
+
+  return {
+    ...draft,
+    phoneticSymbol: draft.phoneticSymbol ?? `/${draft.text}/`,
+    meanings: draft.meanings.length
+      ? draft.meanings.map((meaning) => ({
+          ...meaning,
+          partOfSpeech: meaning.partOfSpeech ?? "noun",
+          exampleSentence: meaning.exampleSentence ?? `This is an example sentence for ${draft.text}.`,
+          explanation: meaning.explanation ?? `${draft.text} is used as a common English word.`,
+          fieldSources: {
+            ...meaning.fieldSources,
+            partOfSpeech: meaning.fieldSources.partOfSpeech ?? "mock_generated",
+            exampleSentence: meaning.fieldSources.exampleSentence ?? "mock_generated",
+            explanation: meaning.fieldSources.explanation ?? "mock_generated",
+          },
+        }))
+      : [
+          {
+            partOfSpeech: "noun",
+            chineseMeaning: `${draft.text} 的中文意思`,
+            exampleSentence: `This is an example sentence for ${draft.text}.`,
+            explanation: `${draft.text} is used as a common English word.`,
+            fieldSources: {
+              partOfSpeech: "mock_generated",
+              chineseMeaning: "mock_generated",
+              exampleSentence: "mock_generated",
+              explanation: "mock_generated",
+            },
+          },
+        ],
+  };
+}
