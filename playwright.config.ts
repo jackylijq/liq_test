@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -12,7 +12,21 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "pad", use: { ...devices["iPad Pro 11"] } },
-    { name: "h5", use: { ...devices["iPhone 13"] } }
+    {
+      name: "pad",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1024, height: 768 },
+        isMobile: false,
+      },
+    },
+    {
+      name: "h5",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+      },
+    },
   ],
 });

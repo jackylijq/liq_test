@@ -56,3 +56,45 @@ select {
   background: #f9fafb;
   font-weight: 700;
 }
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.panel,
+.table {
+  background: #fff;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.panel {
+  display: grid;
+  gap: 12px;
+}
+
+.panel textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.panel button {
+  justify-self: start;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 100px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0f5;
+}
