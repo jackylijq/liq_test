@@ -6,7 +6,7 @@ export default function HomePage() {
       <section className="entry-panel">
         <h1>English Study</h1>
         <div className="entry-actions">
-          <Link href="/teacher/import">老师入口</Link>
+          <Link href="/teacher">老师入口</Link>
           <Link href="/learn">学生入口</Link>
         </div>
       </section>

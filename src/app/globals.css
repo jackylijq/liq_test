@@ -156,6 +156,127 @@ select {
   display: none;
 }
 
+.teacher-workbench {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  background: #f6f7f9;
+}
+
+.teacher-sidebar {
+  border-right: 1px solid #e5e7eb;
+  background: #fff;
+  padding: 20px;
+}
+
+.teacher-sidebar h1 {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.teacher-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.teacher-group {
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.teacher-group.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.teacher-main {
+  min-width: 0;
+  padding: 24px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.teacher-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.teacher-header h2,
+.teacher-header p {
+  margin: 0;
+}
+
+.eyebrow {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.teacher-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.teacher-stats span,
+.teacher-tabs a {
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.teacher-import-panel textarea {
+  min-height: 120px;
+}
+
+.form-error {
+  margin: 0;
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.teacher-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.teacher-tabs a.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  font-weight: 700;
+}
+
+.teacher-term-list {
+  display: grid;
+  gap: 10px;
+}
+
+.teacher-term-card,
+.empty-state {
+  background: #fff;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.teacher-term-card div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.teacher-term-card p {
+  margin: 8px 0 0;
+}
+
 @media (max-width: 760px) {
   html,
   body {
@@ -195,5 +316,35 @@ select {
     display: grid;
     place-items: center;
     font-size: 13px;
+  }
+
+  .teacher-workbench {
+    height: 100dvh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  .teacher-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 14px;
+  }
+
+  .teacher-groups {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .teacher-main {
+    overflow: auto;
+    padding: 16px;
+  }
+
+  .teacher-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

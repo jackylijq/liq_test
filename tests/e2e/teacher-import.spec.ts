@@ -1,6 +1,16 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
 
+test("teacher entry shows default category outline", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "老师入口" }).click();
+  await expect(page).toHaveURL(/\/teacher/);
+  await expect(page.getByRole("heading", { name: "老师工作台" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "1年级上册" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "6年级下册" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "解析到当前分类" })).toBeVisible();
+});
+
 test("teacher can import pasted text and see preview", async ({ page }) => {
   await page.goto("/teacher/import");
   await page.getByLabel("导入内容").fill("apple /ˈæpəl/ n. 苹果 I eat an apple.");
