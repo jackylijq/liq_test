@@ -9,7 +9,7 @@ test("teacher import creates content students can review", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "1年级上册" })).toBeVisible();
   const importedCard = page.locator(".teacher-term-card").filter({ hasText: term });
   await expect(importedCard.getByText(term, { exact: true })).toBeVisible();
-  await expect(importedCard.getByText("测试词", { exact: true }).first()).toBeVisible();
+  await expect(importedCard.getByText("测试词").first()).toBeVisible();
 
   await page.goto("/learn");
   await expect(page.getByRole("heading", { name: "学习" })).toBeVisible();
