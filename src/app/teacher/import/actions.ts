@@ -2,14 +2,16 @@
 
 import { redirect } from "next/navigation";
 import { enrichTermDraft } from "@/lib/enrichment/provider";
+import { parseDocxBuffer } from "@/lib/import/parse-docx";
 import { parseImportedText } from "@/lib/import/parse-text";
+import { parsePdfBuffer } from "@/lib/import/parse-pdf";
 import { prisma } from "@/lib/db";
 import type { TermDraft } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
 
-export async function parsePasteAction(formData: FormData) {
+export async function parseImportAction(formData: FormData) {
   const content = String(formData.get("content") ?? "");
-  const parsed = parseImportedText(content);
+  const parsed = await parseImportFormData(formData, content);
   const enriched = await Promise.all(parsed.map(enrichTermDraft));
   const targetGroup = await getDefaultGroup();
   const batch = await prisma.importBatch.create({
@@ -30,6 +32,26 @@ export async function parsePasteAction(formData: FormData) {
     },
   });
   redirect(`/teacher/import/${batch.id}/preview`);
+}
+
+async function parseImportFormData(formData: FormData, pastedContent: string): Promise<TermDraft[]> {
+  const file = formData.get("file");
+  if (file instanceof File && file.size > 0) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith(".docx") || file.type.includes("wordprocessingml.document")) {
+      return parseDocxBuffer(buffer);
+    }
+
+    if (fileName.endsWith(".pdf") || file.type === "application/pdf") {
+      return parsePdfBuffer(buffer);
+    }
+
+    return parseImportedText(await file.text());
+  }
+
+  return parseImportedText(pastedContent);
 }
 
 export async function getPreviewRows(batchId: string) {
