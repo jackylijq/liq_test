@@ -90,6 +90,14 @@ export async function getPreviewRows(batchId: string) {
   return rows.map((row) => JSON.parse(row.enrichedJson) as TermDraft);
 }
 
+export async function getImportBatch(batchId: string) {
+  const batch = await prisma.importBatch.findUnique({ where: { id: batchId } });
+  if (!batch) return null;
+
+  const group = await prisma.group.findUnique({ where: { id: batch.targetGroupId } });
+  return group ? { ...batch, group } : null;
+}
+
 export async function confirmImportAction(formData: FormData) {
   const batchId = String(formData.get("batchId") ?? "");
   const batch = await prisma.importBatch.findUnique({

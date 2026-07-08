@@ -1,13 +1,16 @@
+import Link from "next/link";
 import type { TermDraft } from "@/lib/types";
-import { confirmImportAction, getPreviewRows } from "../../actions";
+import { confirmImportAction, getImportBatch, getPreviewRows } from "../../actions";
 
 export default async function ImportPreviewPage({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params;
+  const batch = await getImportBatch(batchId);
   const rows = (await getPreviewRows(batchId)) as TermDraft[];
 
   return (
     <main className="page">
       <h1>导入预览</h1>
+      {batch ? <p>目标分类：{batch.group.name}</p> : null}
       <div className="table">
         {rows.map((row, index) => (
           <article className="row" key={`${row.text}-${index}`}>
@@ -21,6 +24,7 @@ export default async function ImportPreviewPage({ params }: { params: Promise<{ 
         <input type="hidden" name="batchId" value={batchId} />
         <button type="submit">确认导入</button>
       </form>
+      {batch ? <Link href={`/teacher?groupId=${batch.targetGroupId}`}>返回当前分类</Link> : null}
     </main>
   );
 }

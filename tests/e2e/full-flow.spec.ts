@@ -1,11 +1,17 @@
 import { expect, test } from "@playwright/test";
 
 test("teacher import creates content students can review", async ({ page }) => {
-  await page.goto("/teacher/import");
-  await page.getByLabel("导入内容").fill("apple /ˈæpəl/ n. 苹果 I eat an apple.");
-  await page.getByRole("button", { name: "解析内容" }).click();
+  const term = `codexapple${Date.now()}`;
+  await page.goto("/teacher");
+  await page.getByLabel("粘贴导入内容").fill(`${term} n. 测试词 I use ${term}.`);
+  await page.getByRole("button", { name: "解析到当前分类" }).click();
   await page.getByRole("button", { name: "确认导入" }).click();
+  await expect(page.getByRole("heading", { name: "1年级上册" })).toBeVisible();
+  const importedCard = page.locator(".teacher-term-card").filter({ hasText: term });
+  await expect(importedCard.getByText(term, { exact: true })).toBeVisible();
+  await expect(importedCard.getByText("测试词", { exact: true }).first()).toBeVisible();
+
   await page.goto("/learn");
-  await expect(page.getByRole("heading", { name: "apple" })).toBeVisible();
-  await expect(page.getByText("苹果")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "学习" })).toBeVisible();
+  await expect(page.locator(".study-card")).toBeVisible();
 });
