@@ -11,12 +11,19 @@ import { normalizeTermText } from "@/lib/terms/normalize";
 
 export async function parseImportAction(formData: FormData) {
   const content = String(formData.get("content") ?? "");
+  const targetGroupId = String(formData.get("targetGroupId") ?? "");
+  const targetGroup = await resolveTargetGroup(targetGroupId);
   const parsed = await parseImportFormData(formData, content);
+
+  if (parsed.length === 0) {
+    redirect(`/teacher?groupId=${targetGroup.id}&error=empty-import`);
+  }
+
   const enriched = await Promise.all(parsed.map(enrichTermDraft));
-  const targetGroup = await getDefaultGroup();
   const batch = await prisma.importBatch.create({
     data: {
       sourceType: "paste",
+      fileName: getImportFileName(formData),
       targetGroupId: targetGroup.id,
       status: "preview",
       rows: {
@@ -32,6 +39,27 @@ export async function parseImportAction(formData: FormData) {
     },
   });
   redirect(`/teacher/import/${batch.id}/preview`);
+}
+
+function getImportFileName(formData: FormData) {
+  const file = formData.get("file");
+  return file instanceof File && file.size > 0 ? file.name : null;
+}
+
+async function resolveTargetGroup(groupId: string) {
+  if (groupId) {
+    const selected = await prisma.group.findUnique({ where: { id: groupId } });
+    if (selected) return selected;
+  }
+
+  const existing = await prisma.group.findFirst({
+    orderBy: { sortOrder: "asc" },
+  });
+  if (existing) return existing;
+
+  return prisma.group.create({
+    data: { name: "1年级上册", sortOrder: 1 },
+  });
 }
 
 async function parseImportFormData(formData: FormData, pastedContent: string): Promise<TermDraft[]> {
@@ -127,16 +155,5 @@ export async function confirmImportAction(formData: FormData) {
     where: { id: batch.id },
     data: { status: "confirmed", confirmedAt: new Date() },
   });
-  redirect("/teacher/library");
-}
-
-async function getDefaultGroup() {
-  const existing = await prisma.group.findFirst({
-    orderBy: { sortOrder: "asc" },
-  });
-  if (existing) return existing;
-
-  return prisma.group.create({
-    data: { name: "1年级上册", sortOrder: 1 },
-  });
+  redirect(`/teacher?groupId=${batch.targetGroupId}`);
 }

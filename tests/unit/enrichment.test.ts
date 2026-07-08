@@ -13,10 +13,15 @@ describe("mockEnrichTerm", () => {
   });
 
   it("fills phrase usage context without phonetic symbol or part of speech", async () => {
-    const draft: TermDraft = { text: "look after", termType: "phrase", meanings: [] };
+    const draft: TermDraft = {
+      text: "look after",
+      termType: "phrase",
+      meanings: [{ chineseMeaning: "照顾", fieldSources: { chineseMeaning: "parsed" } }],
+    };
     const enriched = await mockEnrichTerm(draft);
     expect(enriched.phoneticSymbol).toBeUndefined();
     expect(enriched.meanings[0].partOfSpeech).toBeUndefined();
+    expect(enriched.meanings[0].chineseMeaning).toBe("照顾");
     expect(enriched.meanings[0].usageContext).toContain("常用场景");
   });
 });

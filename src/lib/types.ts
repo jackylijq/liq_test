@@ -1,5 +1,5 @@
 export type TermType = "word" | "phrase";
-export type FieldSource = "parsed" | "ai_generated" | "mock_generated" | "edited";
+export type FieldSource = "parsed" | "ai_generated" | "mock_generated" | "web_lookup" | "edited";
 
 export type MeaningFieldName =
   | "partOfSpeech"
