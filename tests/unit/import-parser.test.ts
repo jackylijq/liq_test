@@ -22,6 +22,26 @@ describe("parseImportedText", () => {
     expect(rows[0].meanings[0].chineseMeaning).toBe("照顾");
   });
 
+  it("parses loose multi-line word blocks with phonetics and meanings", () => {
+    const rows = parseImportedText(`care
+/care/
+noun
+n.：照顾; 小心; 忧虑
+
+v.：照顾; 关心; 担心; 喜爱`);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      text: "care",
+      termType: "word",
+      phoneticSymbol: "/care/",
+    });
+    expect(rows[0].meanings[0]).toMatchObject({
+      partOfSpeech: "noun",
+      chineseMeaning: "照顾",
+    });
+  });
+
   it("parses textbook markdown by section without treating headings as terms", () => {
     const rows = parseImportedText(`# 七年级英语校本教材
 

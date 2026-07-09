@@ -709,7 +709,7 @@ export function parseImportedText(text: string): TermDraft[] {
   const rows: TermDraft[] = [];
   const context: ParseContext = {};
 
-  for (const rawLine of text.split(/\r?\n/).flatMap((line) => line.split(/\t(?=[A-Za-z])/))) {
+  for (const rawLine of normalizeLooseWordBlocks(text).flatMap((line) => line.split(/\t(?=[A-Za-z])/))) {
     const line = rawLine.trim();
     if (!line) continue;
     if (/^-{3,}$/.test(line)) continue;
@@ -765,4 +765,57 @@ export function parseImportedText(text: string): TermDraft[] {
   }
 
   return dedupeRows(rows);
+}
+
+function normalizeLooseWordBlocks(text: string) {
+  const rawLines = text.split(/\r?\n/);
+  const normalizedLines: string[] = [];
+
+  for (let index = 0; index < rawLines.length; index += 1) {
+    const line = rawLines[index].trim();
+    const nextLine = rawLines[index + 1]?.trim() ?? "";
+
+    if (isSingleEnglishWord(line) && isPhoneticOnly(nextLine)) {
+      const meaningLines: string[] = [];
+      let cursor = index + 2;
+
+      while (cursor < rawLines.length) {
+        const current = rawLines[cursor].trim();
+        if (!current) {
+          cursor += 1;
+          continue;
+        }
+        if (isSingleEnglishWord(current) && !isPartHeadingWord(current)) break;
+        if (/^#{1,6}\s/.test(current) || classifyPlainLine(current)) break;
+        meaningLines.push(current);
+        cursor += 1;
+      }
+
+      if (meaningLines.some((item) => /[\u4e00-\u9fa5]/.test(item))) {
+        normalizedLines.push([line, nextLine, ...meaningLines.filter((item) => !isPartHeadingWord(item)).map(normalizePartMeaningLine)].join(" "));
+        index = cursor - 1;
+        continue;
+      }
+    }
+
+    normalizedLines.push(rawLines[index]);
+  }
+
+  return normalizedLines;
+}
+
+function isSingleEnglishWord(line: string) {
+  return /^[A-Za-z][A-Za-z'-]*$/.test(line.trim());
+}
+
+function isPhoneticOnly(line: string) {
+  return /^(\/[^/]+\/|\[[^\]]+\])$/.test(line.trim());
+}
+
+function isPartHeadingWord(line: string) {
+  return /^(noun|verb|adjective|adverb|n|v|adj|adv)$/i.test(line.trim());
+}
+
+function normalizePartMeaningLine(line: string) {
+  return line.replace(/^((?:n|v|adj|adv|prep|pron|conj|interj|modal)\.)[：:]\s*/i, "$1 ");
 }
