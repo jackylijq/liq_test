@@ -21,7 +21,7 @@ export async function parseImportAction(formData: FormData) {
     redirect(`/teacher?groupId=${targetGroup.id}&error=empty-import`);
   }
 
-  const enriched = parsedImport.mode === "source" ? await Promise.all(parsed.map(enrichTermDraft)) : parsed;
+  const enriched = parsedImport.mode === "source" ? await Promise.all(parsed.map((row) => enrichTermDraft(row))) : parsed;
   const batch = await prisma.importBatch.create({
     data: {
       sourceType: parsedImport.mode,

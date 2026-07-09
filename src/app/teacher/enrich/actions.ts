@@ -19,7 +19,7 @@ export async function enrichTeacherTermsAction(formData: FormData) {
   const terms = await getTermsForEnrichment(targetGroupId, mode === "all" ? undefined : selectedIds);
   for (const term of terms) {
     const draft = dbTermToDraft(term);
-    const enriched = await enrichTermDraft(draft);
+    const enriched = await enrichTermDraft(draft, { useBrowser: true });
     await saveEnrichedTerm(term, enriched);
   }
 
