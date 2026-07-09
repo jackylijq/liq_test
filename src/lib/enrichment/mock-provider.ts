@@ -8,10 +8,16 @@ export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
       meanings: draft.meanings.length
         ? draft.meanings.map((meaning) => ({
             ...meaning,
+            chineseMeaning: meaning.chineseMeaning.trim() || `${draft.text} 的中文意思`,
+            exampleSentence: meaning.exampleSentence ?? `Please use "${draft.text}" in a simple sentence.`,
             partOfSpeech: undefined,
             usageContext: meaning.usageContext ?? `常用场景：${draft.text} 常用于日常交流和课文表达中。`,
             fieldSources: {
               ...meaning.fieldSources,
+              chineseMeaning: meaning.chineseMeaning.trim()
+                ? meaning.fieldSources.chineseMeaning
+                : "mock_generated",
+              exampleSentence: meaning.fieldSources.exampleSentence ?? "mock_generated",
               usageContext: meaning.fieldSources.usageContext ?? "mock_generated",
             },
           }))
@@ -37,11 +43,15 @@ export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
       ? draft.meanings.map((meaning) => ({
           ...meaning,
           partOfSpeech: meaning.partOfSpeech ?? "noun",
+          chineseMeaning: meaning.chineseMeaning.trim() || `${draft.text} 的中文意思`,
           exampleSentence: meaning.exampleSentence ?? `This is an example sentence for ${draft.text}.`,
           explanation: meaning.explanation ?? `${draft.text} is used as a common English word.`,
           fieldSources: {
             ...meaning.fieldSources,
             partOfSpeech: meaning.fieldSources.partOfSpeech ?? "mock_generated",
+            chineseMeaning: meaning.chineseMeaning.trim()
+              ? meaning.fieldSources.chineseMeaning
+              : "mock_generated",
             exampleSentence: meaning.fieldSources.exampleSentence ?? "mock_generated",
             explanation: meaning.fieldSources.explanation ?? "mock_generated",
           },

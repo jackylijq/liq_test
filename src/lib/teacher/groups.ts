@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { defaultGradeGroupNames } from "./default-groups";
 
 export type TeacherGroupOption = {
   id: string;
@@ -47,6 +48,7 @@ export function summarizeTeacherTerms(terms: TeacherTermForSummary[]) {
 }
 
 export async function getTeacherGroups(): Promise<TeacherGroupOption[]> {
+  await ensureDefaultTeacherGroups();
   return prisma.group.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     select: { id: true, name: true, sortOrder: true },
@@ -59,4 +61,25 @@ export async function getTeacherGroupTerms(groupId: string) {
     include: { meanings: true },
     orderBy: [{ termType: "asc" }, { text: "asc" }],
   });
+}
+
+async function ensureDefaultTeacherGroups() {
+  for (const [index, name] of defaultGradeGroupNames.entries()) {
+    const existing = await prisma.group.findFirst({
+      where: { name, parentId: null },
+    });
+
+    if (existing) {
+      if (existing.sortOrder !== index + 1) {
+        await prisma.group.update({
+          where: { id: existing.id },
+          data: { sortOrder: index + 1 },
+        });
+      }
+    } else {
+      await prisma.group.create({
+        data: { name, sortOrder: index + 1 },
+      });
+    }
+  }
 }

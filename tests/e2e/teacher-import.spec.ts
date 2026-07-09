@@ -8,6 +8,7 @@ test("teacher entry shows default category outline", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "老师工作台" })).toBeVisible();
   await expect(page.getByRole("link", { name: "1年级上册" })).toBeVisible();
   await expect(page.getByRole("link", { name: "6年级下册" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "9年级下册" })).toBeVisible();
   await expect(page.getByRole("button", { name: "解析到当前分类" })).toBeVisible();
 });
 

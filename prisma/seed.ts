@@ -1,24 +1,10 @@
 import { PrismaClient } from "@prisma/client";
+import { defaultGradeGroupNames } from "../src/lib/teacher/default-groups";
 
 const prisma = new PrismaClient();
 
-const grades = [
-  "1年级上册",
-  "1年级下册",
-  "2年级上册",
-  "2年级下册",
-  "3年级上册",
-  "3年级下册",
-  "4年级上册",
-  "4年级下册",
-  "5年级上册",
-  "5年级下册",
-  "6年级上册",
-  "6年级下册",
-];
-
 async function main() {
-  for (const [index, name] of grades.entries()) {
+  for (const [index, name] of defaultGradeGroupNames.entries()) {
     const existing = await prisma.group.findFirst({
       where: { name, parentId: null },
     });

@@ -12,6 +12,19 @@ describe("mockEnrichTerm", () => {
     expect(enriched.meanings[0].chineseMeaning).toBeTruthy();
   });
 
+  it("fills missing Chinese meaning and example sentence on parsed word meanings", async () => {
+    const draft: TermDraft = {
+      text: "fox",
+      termType: "word",
+      meanings: [{ partOfSpeech: "noun", chineseMeaning: "", fieldSources: { partOfSpeech: "parsed" } }],
+    };
+    const enriched = await mockEnrichTerm(draft);
+    expect(enriched.meanings[0].partOfSpeech).toBe("noun");
+    expect(enriched.meanings[0].chineseMeaning).toBe("fox 的中文意思");
+    expect(enriched.meanings[0].exampleSentence).toBe("This is an example sentence for fox.");
+    expect(enriched.meanings[0].fieldSources.chineseMeaning).toBe("mock_generated");
+  });
+
   it("fills phrase usage context without phonetic symbol or part of speech", async () => {
     const draft: TermDraft = {
       text: "look after",
