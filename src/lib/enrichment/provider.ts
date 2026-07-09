@@ -28,7 +28,7 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
     try {
       const browserDraft = await baiduBrowserTranslateTerm(baiduDraft ?? draft);
       if (hasWebLookupMeaning(browserDraft)) {
-        return await mockEnrichTerm(browserDraft);
+        return browserDraft;
       }
     } catch {
       // Browser scraping depends on Baidu's live page and can fail under captcha/risk checks.

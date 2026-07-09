@@ -83,6 +83,48 @@ describe("parseBaiduBrowserTranslateResponse", () => {
       },
     ]);
   });
+
+  it("replaces mock placeholder phrase meanings with browser meanings", () => {
+    const parsed = parseBaiduBrowserTranslateResponse(
+      {
+        status: 0,
+        result: JSON.stringify({
+          content: [
+            {
+              mean: [
+                {
+                  cont: {
+                    在全国各地: 0,
+                    遍及全国: 0,
+                  },
+                },
+              ],
+            },
+          ],
+          src: "Across the country",
+        }),
+      },
+      {
+        text: "Across the country",
+        termType: "phrase",
+        meanings: [
+          {
+            chineseMeaning: "Across the country 的中文意思",
+            exampleSentence: 'Please use "Across the country" in a simple sentence.',
+            fieldSources: { chineseMeaning: "mock_generated", exampleSentence: "mock_generated" },
+          },
+        ],
+      },
+    );
+
+    expect(parsed.meanings).toEqual([
+      {
+        chineseMeaning: "在全国各地；遍及全国",
+        exampleSentence: undefined,
+        fieldSources: { chineseMeaning: "web_lookup" },
+      },
+    ]);
+  });
 });
 
 describe("baiduBrowserTranslateTerm", () => {

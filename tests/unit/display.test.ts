@@ -77,4 +77,20 @@ describe("term display formatting", () => {
     expect(shouldShowExplanation(meanings[0])).toBe(false);
     expect(getVisibleExplanations(meanings)).toEqual(["用于表示关心或照顾。"]);
   });
+
+  it("hides mock-generated examples from old enrichment results", () => {
+    expect(
+      getVisibleExampleSentences("phrase", "Across the country", [
+        {
+          chineseMeaning: "Across the country 的中文意思",
+          exampleSentence: 'Please use "Across the country" in a simple sentence.',
+          fieldSourcesJson: '{"chineseMeaning":"mock_generated","exampleSentence":"mock_generated"}',
+        },
+        {
+          chineseMeaning: "在全国各地；遍及全国",
+          fieldSourcesJson: '{"chineseMeaning":"web_lookup"}',
+        },
+      ]),
+    ).toEqual([]);
+  });
 });

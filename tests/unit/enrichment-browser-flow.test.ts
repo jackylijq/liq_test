@@ -32,6 +32,6 @@ describe("enrichTermDraft browser fallback", () => {
     expect(baiduBrowserTranslateTerm).toHaveBeenCalledOnce();
     expect(enriched.meanings[0].chineseMeaning).toBe("全国各地");
     expect(enriched.meanings[0].fieldSources.chineseMeaning).toBe("web_lookup");
-    expect(enriched.meanings[0].exampleSentence).toBe('Please use "Across the country" in a simple sentence.');
+    expect(enriched.meanings[0].exampleSentence).toBeUndefined();
   });
 });

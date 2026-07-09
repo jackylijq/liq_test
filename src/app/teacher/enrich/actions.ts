@@ -76,28 +76,32 @@ async function saveEnrichedTerm(term: DbTerm, draft: TermDraft) {
     },
   });
 
+  const savedMeaningIds: string[] = [];
+
   for (const meaning of draft.meanings) {
     if (!hasMeaningContent(meaning)) continue;
 
-    const existing = findExistingMeaning(term.meanings, meaning);
+    const existing = findExistingMeaning(term, meaning, savedMeaningIds);
     if (existing) {
+      const exampleSentence = shouldReplaceNullableField(existing, meaning, "exampleSentence");
+      const explanation = shouldReplaceNullableField(existing, meaning, "explanation");
+      const usageContext = shouldReplaceNullableField(existing, meaning, "usageContext");
       await prisma.termMeaning.update({
         where: { id: existing.id },
         data: {
-          chineseMeaning: shouldReplaceChineseMeaning(existing, meaning) ? meaning.chineseMeaning : existing.chineseMeaning,
-          exampleSentence: existing.exampleSentence ?? meaning.exampleSentence ?? null,
-          explanation: existing.explanation ?? meaning.explanation ?? null,
-          usageContext: existing.usageContext ?? meaning.usageContext ?? null,
-          fieldSourcesJson: JSON.stringify({
-            ...parseFieldSourcesJson(existing.fieldSourcesJson),
-            ...meaning.fieldSources,
-          }),
+          partOfSpeech: draft.termType === "word" ? (meaning.partOfSpeech ?? existing.partOfSpeech) : null,
+          chineseMeaning: shouldReplaceChineseMeaning(term.text, existing, meaning) ? meaning.chineseMeaning : existing.chineseMeaning,
+          exampleSentence,
+          explanation,
+          usageContext,
+          fieldSourcesJson: JSON.stringify(mergeMeaningFieldSources(existing, meaning, { exampleSentence, explanation, usageContext })),
         },
       });
+      savedMeaningIds.push(existing.id);
       continue;
     }
 
-    await prisma.termMeaning.create({
+    const created = await prisma.termMeaning.create({
       data: {
         termId: term.id,
         partOfSpeech: draft.termType === "word" ? (meaning.partOfSpeech ?? null) : null,
@@ -108,17 +112,22 @@ async function saveEnrichedTerm(term: DbTerm, draft: TermDraft) {
         fieldSourcesJson: JSON.stringify(meaning.fieldSources),
       },
     });
+    savedMeaningIds.push(created.id);
   }
+
+  await deleteStaleLookupMeanings(term, draft, savedMeaningIds);
 }
 
-function findExistingMeaning(existingMeanings: DbTerm["meanings"], meaning: MeaningDraft) {
+function findExistingMeaning(term: DbTerm, meaning: MeaningDraft, excludedIds: string[]) {
+  const availableMeanings = term.meanings.filter((saved) => !excludedIds.includes(saved.id));
   return (
-    existingMeanings.find((saved) => meaning.partOfSpeech && saved.partOfSpeech === meaning.partOfSpeech) ??
-    existingMeanings.find((saved) => saved.chineseMeaning.trim() === meaning.chineseMeaning.trim())
+    availableMeanings.find((saved) => meaning.partOfSpeech && saved.partOfSpeech === meaning.partOfSpeech) ??
+    availableMeanings.find((saved) => saved.chineseMeaning.trim() === meaning.chineseMeaning.trim()) ??
+    availableMeanings.find((saved) => meaning.fieldSources.chineseMeaning === "web_lookup" && shouldReplaceChineseMeaning(term.text, saved, meaning))
   );
 }
 
-function shouldReplaceChineseMeaning(existing: DbTerm["meanings"][number], meaning: MeaningDraft) {
+function shouldReplaceChineseMeaning(termText: string, existing: DbTerm["meanings"][number], meaning: MeaningDraft) {
   const existingText = existing.chineseMeaning.trim();
   const incomingText = meaning.chineseMeaning.trim();
   if (!incomingText) return false;
@@ -126,8 +135,59 @@ function shouldReplaceChineseMeaning(existing: DbTerm["meanings"][number], meani
 
   const existingSources = parseFieldSourcesJson(existing.fieldSourcesJson);
   if (existingSources.chineseMeaning === "mock_generated") return true;
+  if (existingText === `${termText.trim()} 的中文意思`) return true;
   if (meaning.fieldSources.chineseMeaning !== "web_lookup") return false;
   return incomingText.length > existingText.length;
+}
+
+function shouldReplaceNullableField(existing: DbTerm["meanings"][number], meaning: MeaningDraft, fieldName: "exampleSentence" | "explanation" | "usageContext") {
+  const existingSources = parseFieldSourcesJson(existing.fieldSourcesJson) as Record<string, string | undefined>;
+  const incoming = meaning[fieldName]?.trim() || null;
+  if (existingSources[fieldName] === "mock_generated") return incoming;
+  return existing[fieldName] ?? incoming;
+}
+
+function mergeMeaningFieldSources(
+  existing: DbTerm["meanings"][number],
+  meaning: MeaningDraft,
+  nextFields: Record<"exampleSentence" | "explanation" | "usageContext", string | null>,
+) {
+  const fieldSources = {
+    ...parseFieldSourcesJson(existing.fieldSourcesJson),
+    ...meaning.fieldSources,
+  };
+
+  for (const fieldName of ["exampleSentence", "explanation", "usageContext"] as const) {
+    if (!nextFields[fieldName] && fieldSources[fieldName] === "mock_generated") {
+      delete fieldSources[fieldName];
+    }
+  }
+
+  return fieldSources;
+}
+
+async function deleteStaleLookupMeanings(term: DbTerm, draft: TermDraft, savedMeaningIds: string[]) {
+  const incomingWebMeanings = draft.meanings.filter((meaning) => meaning.fieldSources.chineseMeaning === "web_lookup" && meaning.chineseMeaning.trim());
+  if (!incomingWebMeanings.length) return;
+
+  const incomingParts = new Set(incomingWebMeanings.map((meaning) => meaning.partOfSpeech).filter(Boolean));
+  const staleIds = term.meanings
+    .filter((meaning) => !savedMeaningIds.includes(meaning.id))
+    .filter((meaning) => {
+      const sources = parseFieldSourcesJson(meaning.fieldSourcesJson);
+      if (sources.chineseMeaning === "mock_generated") return true;
+      if (meaning.chineseMeaning.trim() === `${term.text.trim()} 的中文意思`) return true;
+      if (sources.chineseMeaning === "web_lookup" && (draft.termType !== "word" || incomingParts.size === 0)) return true;
+      if (sources.chineseMeaning === "web_lookup" && incomingParts.size > 0 && (!meaning.partOfSpeech || !incomingParts.has(meaning.partOfSpeech))) {
+        return true;
+      }
+      return false;
+    })
+    .map((meaning) => meaning.id);
+
+  if (staleIds.length) {
+    await prisma.termMeaning.deleteMany({ where: { id: { in: staleIds } } });
+  }
 }
 
 function hasMeaningContent(meaning: MeaningDraft) {

@@ -93,6 +93,29 @@ describe("parseBaiduTranslateResponse", () => {
       },
     ]);
   });
+
+  it("replaces mock placeholder meanings with Baidu text translation", () => {
+    const parsed = parseBaiduTranslateResponse(
+      { trans_result: { data: [{ src: "Across the country", dst: "全国各地" }] } },
+      {
+        text: "Across the country",
+        termType: "phrase",
+        meanings: [
+          {
+            chineseMeaning: "Across the country 的中文意思",
+            fieldSources: { chineseMeaning: "mock_generated" },
+          },
+        ],
+      },
+    );
+
+    expect(parsed.meanings).toEqual([
+      {
+        chineseMeaning: "全国各地",
+        fieldSources: { chineseMeaning: "web_lookup" },
+      },
+    ]);
+  });
 });
 
 describe("baiduTranslateEnrichTerm", () => {

@@ -206,16 +206,30 @@ function mergeBrowserMeaning(draft: TermDraft, chineseMeaning: string): MeaningD
   }
 
   return draft.meanings.map((meaning, index) => {
-    if (index > 0 || meaning.chineseMeaning.trim()) return meaning;
+    if (index > 0 || hasVisibleChineseMeaning(draft.text, meaning)) return meaning;
     return {
       ...meaning,
       chineseMeaning,
+      exampleSentence: meaning.fieldSources.exampleSentence === "mock_generated" ? undefined : meaning.exampleSentence,
+      explanation: meaning.fieldSources.explanation === "mock_generated" ? undefined : meaning.explanation,
+      usageContext: meaning.fieldSources.usageContext === "mock_generated" ? undefined : meaning.usageContext,
       fieldSources: {
-        ...meaning.fieldSources,
+        ...withoutMockOnlySources(meaning.fieldSources),
         chineseMeaning: "web_lookup",
       },
     };
   });
+}
+
+function hasVisibleChineseMeaning(termText: string, meaning: MeaningDraft) {
+  const chineseMeaning = meaning.chineseMeaning.trim();
+  if (!chineseMeaning) return false;
+  if (meaning.fieldSources.chineseMeaning === "mock_generated") return false;
+  return chineseMeaning !== `${termText.trim()} 的中文意思`;
+}
+
+function withoutMockOnlySources(fieldSources: MeaningDraft["fieldSources"]) {
+  return Object.fromEntries(Object.entries(fieldSources).filter(([, source]) => source !== "mock_generated")) as MeaningDraft["fieldSources"];
 }
 
 export function parseBaiduBrowserTranslateResponse(response: unknown, draft: TermDraft): TermDraft {

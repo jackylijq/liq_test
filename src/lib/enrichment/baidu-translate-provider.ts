@@ -126,19 +126,27 @@ function mergeParsedMeanings(draft: TermDraft, generated: MeaningDraft[]) {
   return generated.map((meaning, index) => {
     const existing = draft.meanings[index] ?? draft.meanings.find((item) => item.partOfSpeech === meaning.partOfSpeech);
     if (!existing) return meaning;
+    const existingHasVisibleChinese = hasVisibleChineseMeaning(draft.text, existing);
     return {
       ...meaning,
-      chineseMeaning: existing.chineseMeaning.trim() || meaning.chineseMeaning,
+      chineseMeaning: existingHasVisibleChinese ? existing.chineseMeaning : meaning.chineseMeaning,
       exampleSentence: existing.exampleSentence ?? meaning.exampleSentence,
       explanation: existing.explanation ?? meaning.explanation,
       usageContext: existing.usageContext ?? meaning.usageContext,
       fieldSources: {
         ...meaning.fieldSources,
         ...existing.fieldSources,
-        chineseMeaning: existing.chineseMeaning.trim() ? existing.fieldSources.chineseMeaning : meaning.fieldSources.chineseMeaning,
+        chineseMeaning: existingHasVisibleChinese ? existing.fieldSources.chineseMeaning : meaning.fieldSources.chineseMeaning,
       },
     };
   });
+}
+
+function hasVisibleChineseMeaning(termText: string, meaning: MeaningDraft) {
+  const chineseMeaning = meaning.chineseMeaning.trim();
+  if (!chineseMeaning) return false;
+  if (meaning.fieldSources.chineseMeaning === "mock_generated") return false;
+  return chineseMeaning !== `${termText.trim()} 的中文意思`;
 }
 
 function parseDictionaryMeanings(response: BaiduResponse, termType: TermType): MeaningDraft[] {

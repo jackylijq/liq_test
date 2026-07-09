@@ -29,12 +29,12 @@ type DisplayMeaning = {
   fieldSourcesJson?: string | null;
 };
 
-function getFieldSources(meaning: DisplayMeaning) {
+function getFieldSources(meaning: DisplayMeaning): NonNullable<DisplayMeaning["fieldSources"]> {
   if (meaning.fieldSources) return meaning.fieldSources;
   if (!meaning.fieldSourcesJson) return {};
 
   try {
-    return JSON.parse(meaning.fieldSourcesJson) as { chineseMeaning?: string };
+    return JSON.parse(meaning.fieldSourcesJson) as NonNullable<DisplayMeaning["fieldSources"]>;
   } catch {
     return {};
   }
@@ -94,6 +94,7 @@ export function shouldShowExplanation(meaning: { explanation?: string | null; fi
 
 export function getVisibleExampleSentences(termType: TermType | string, termText: string, meanings: DisplayMeaning[]) {
   const examples = meanings
+    .filter((meaning) => getFieldSources(meaning).exampleSentence !== "mock_generated")
     .map((meaning) => meaning.exampleSentence?.trim())
     .filter((sentence): sentence is string => Boolean(sentence && shouldShowExampleSentence(termType, termText, sentence)));
   return [...new Set(examples)];
