@@ -140,6 +140,8 @@ export async function confirmImportAction(formData: FormData) {
         text: draft.text,
         normalizedText: normalizeTermText(draft.text),
         termType: draft.termType,
+        phoneticSymbol: draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null,
+        pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null,
         createdSource: "import",
       },
       include: { meanings: true },
@@ -183,6 +185,13 @@ async function applySupplementDraft(draft: TermDraft) {
   });
   if (!term) return;
 
+  await prisma.term.update({
+    where: { id: term.id },
+    data: {
+      phoneticSymbol: term.phoneticSymbol ?? (draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null),
+      pronunciationUrl: term.pronunciationUrl ?? (draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null),
+    },
+  });
   await saveDraftMeanings(term.id, draft, term.meanings);
 }
 

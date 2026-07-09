@@ -20,7 +20,7 @@ test("h5 layout shows bottom navigation", async ({ page, isMobile }) => {
 test("learn page uses grade unit and section filters", async ({ page }) => {
   const unitName = `Unit 1 Learn ${Date.now()}`;
 
-  await page.goto("/teacher");
+  await page.goto("/teacher/import");
   await page.getByLabel("粘贴 MD/TXT 导入内容").fill(`# Learn Fixture
 
 ## ${unitName}

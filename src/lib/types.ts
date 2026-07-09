@@ -22,6 +22,7 @@ export type TermDraft = {
   normalizedText?: string;
   termType: TermType;
   phoneticSymbol?: string;
+  pronunciationUrl?: string;
   categoryPath?: string[];
   meanings: MeaningDraft[];
 };

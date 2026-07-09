@@ -59,6 +59,7 @@ export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
   return {
     ...draft,
     phoneticSymbol: draft.phoneticSymbol ?? `/${draft.text}/`,
+    pronunciationUrl: draft.pronunciationUrl ?? `https://fanyi.baidu.com/gettts?lan=en&text=${encodeURIComponent(draft.text)}&spd=3&source=web`,
     meanings: draft.meanings.length
       ? draft.meanings.map((meaning) => ({
           ...meaning,

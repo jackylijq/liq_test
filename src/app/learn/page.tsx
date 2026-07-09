@@ -72,7 +72,13 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
               const meaning = term.meanings[0];
               return (
                 <article className="study-card" key={term.id}>
-                  <h2>{term.text}</h2>
+                  <h2>
+                    <span>{term.text}</span>
+                    {term.termType === "word" && term.phoneticSymbol ? <small>{term.phoneticSymbol}</small> : null}
+                    {term.termType === "word" && term.pronunciationUrl ? (
+                      <audio aria-label={`${term.text} 发音`} controls preload="none" src={term.pronunciationUrl} />
+                    ) : null}
+                  </h2>
                   <p>{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
                   {getMeaningLines(term.termType, term.meanings, term.text).map((line, index) => (
                     <p key={`${term.id}-meaning-${index}`}>{line}</p>

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { parseImportAction } from "./import/actions";
 import {
   getTeacherContentOutline,
   getTeacherGroups,
@@ -49,33 +48,24 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
             <p className="eyebrow">当前分类</p>
             <h2>{contentTitle}</h2>
           </div>
-          <div className="teacher-stats">
-            <span>单词 {summary.wordCount}</span>
-            <span>短语 {summary.phraseCount}</span>
-            <span>句子 {summary.sentenceCount}</span>
-            <span>待补全 {summary.missingFieldCount}</span>
+          <div className="teacher-header-actions">
+            {selectedGroup ? (
+              <Link className="primary-link" href={`/teacher/import?groupId=${selectedGroup.id}`}>
+                新增内容
+              </Link>
+            ) : null}
+            <div className="teacher-stats">
+              <span>单词 {summary.wordCount}</span>
+              <span>短语 {summary.phraseCount}</span>
+              <span>句子 {summary.sentenceCount}</span>
+              <span>待补全 {summary.missingFieldCount}</span>
+            </div>
           </div>
         </header>
 
         {params.error === "empty-import" ? <p className="form-error">请先上传文件或填写导入内容。</p> : null}
 
-        {selectedGroup ? (
-          <form action={parseImportAction} className="panel teacher-import-panel">
-            <input type="hidden" name="targetGroupId" value={selectedGroup.id} />
-            <label htmlFor="file">上传 MD/TXT 新增词条，或 PDF/Word 补充匹配</label>
-            <input
-              id="file"
-              name="file"
-              type="file"
-              accept=".md,.markdown,.pdf,.docx,.txt,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            />
-            <label htmlFor="content">粘贴 MD/TXT 导入内容</label>
-            <textarea id="content" name="content" rows={6} />
-            <button type="submit">解析到当前分类</button>
-          </form>
-        ) : (
-          <section className="panel">暂无分类，请先运行种子数据。</section>
-        )}
+        {!selectedGroup ? <section className="panel">暂无分类，请先运行种子数据。</section> : null}
 
         {selectedGroup && outline.length > 0 ? (
           <section className="teacher-outline-panel" aria-label="单元与内容筛选">
@@ -114,6 +104,10 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
               <article className="teacher-term-card" key={term.id}>
                 <div>
                   <strong>{term.text}</strong>
+                  {term.termType === "word" && term.phoneticSymbol ? <span>{term.phoneticSymbol}</span> : null}
+                  {term.termType === "word" && term.pronunciationUrl ? (
+                    <audio aria-label={`${term.text} 发音`} controls preload="none" src={term.pronunciationUrl} />
+                  ) : null}
                   {term.termType === "word" ? <span>{term.meanings[0]?.partOfSpeech}</span> : null}
                   {term.termType === "phrase" ? <span>短语</span> : null}
                   {term.termType === "sentence" ? <span>句子</span> : null}
