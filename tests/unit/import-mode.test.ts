@@ -110,4 +110,45 @@ describe("buildSupplementDrafts", () => {
     expect(matched[0].meanings[0].partOfSpeech).toBeUndefined();
     expect(matched[0].phoneticSymbol).toBeUndefined();
   });
+
+  it("matches compact PDF sentence supplements to spaced markdown sentences", () => {
+    const matched = buildSupplementDrafts(
+      [
+        {
+          text: "Isthetailofthisanimallong?",
+          termType: "sentence",
+          meanings: [
+            {
+              chineseMeaning: "这个动物的尾巴长吗",
+              exampleSentence: "Isthetailofthisanimallong?",
+              fieldSources: { chineseMeaning: "parsed", exampleSentence: "parsed" },
+            },
+          ],
+        },
+      ],
+      [
+        {
+          text: "Is the tail of this animal long?",
+          normalizedText: "is the tail of this animal long?",
+          termType: "sentence",
+        },
+      ],
+    );
+
+    expect(matched).toEqual([
+      {
+        text: "Is the tail of this animal long?",
+        normalizedText: "is the tail of this animal long?",
+        termType: "sentence",
+        phoneticSymbol: undefined,
+        meanings: [
+          {
+            chineseMeaning: "这个动物的尾巴长吗",
+            exampleSentence: "Is the tail of this animal long?",
+            fieldSources: { chineseMeaning: "parsed", exampleSentence: "parsed" },
+          },
+        ],
+      },
+    ]);
+  });
 });
