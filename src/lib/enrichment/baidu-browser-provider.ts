@@ -1,4 +1,5 @@
 import type { Browser, Page } from "playwright";
+import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
 import { buildBaiduTtsUrl } from "./baidu-translate-provider";
 
@@ -21,6 +22,7 @@ function getTimeout(options: BaiduBrowserTranslateOptions) {
 
 async function getBrowser() {
   if (!browserPromise) {
+    logTeacherDebug("provider", "browser-provider:launch", {});
     browserPromise = import("playwright").then(({ chromium }) =>
       chromium.launch({
         headless: true,
@@ -42,10 +44,16 @@ async function withBaiduPage<T>(timeoutMs: number, callback: (page: Page) => Pro
 
   try {
     page.setDefaultTimeout(timeoutMs);
+    logTeacherDebug("provider", "browser-provider:goto:before", { timeoutMs });
     await page.goto("https://fanyi.baidu.com/", { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    logTeacherDebug("provider", "browser-provider:goto:after", {
+      url: page.url(),
+      title: await page.title().catch(() => ""),
+    });
     await page.waitForFunction(() => typeof window !== "undefined" && typeof (window as unknown as { v2Fetch?: unknown }).v2Fetch === "function", {
       timeout: timeoutMs,
     });
+    logTeacherDebug("provider", "browser-provider:v2fetch:ready", {});
     return await callback(page);
   } finally {
     await page.close().catch(() => undefined);
@@ -76,6 +84,25 @@ async function translateWithBaiduBrowser(text: string, timeoutMs: number) {
       });
     }, text),
   );
+}
+
+function summarizeBrowserResponse(response: unknown) {
+  const record = response && typeof response === "object" ? (response as BaiduBrowserResponse) : undefined;
+  const result = parseJsonObject(record?.result);
+  const content = Array.isArray(result?.content) ? result.content : [];
+  const voice = Array.isArray(result?.voice) ? result.voice : [];
+
+  return {
+    type: typeof response,
+    status: record?.status,
+    errno: record?.errno,
+    resultType: typeof record?.result,
+    resultKeys: result ? Object.keys(result) : [],
+    src: typeof result?.src === "string" ? result.src : undefined,
+    contentCount: content.length,
+    voiceCount: voice.length,
+    firstContent: content[0],
+  };
 }
 
 function parseJsonObject(value: unknown): Record<string, unknown> | undefined {
@@ -272,11 +299,27 @@ function buildReviewExplanation(sourceText: string) {
 
 export function parseBaiduBrowserTranslateResponse(response: unknown, draft: TermDraft): TermDraft {
   const baiduResponse = response as BaiduBrowserResponse;
-  if (baiduResponse.status !== 0 && baiduResponse.errno !== 0) return draft;
+  logTeacherDebug("provider", "browser-provider:parse:input", {
+    text: draft.text,
+    response: summarizeBrowserResponse(response),
+  });
+  if (baiduResponse.status !== 0 && baiduResponse.errno !== 0) {
+    logTeacherDebug("provider", "browser-provider:parse:ignored-status", {
+      status: baiduResponse.status,
+      errno: baiduResponse.errno,
+    });
+    return draft;
+  }
 
   const result = parseJsonObject(baiduResponse.result);
   const structuredMeanings = draft.termType === "word" ? collectStructuredMeanings(result) : [];
   const chineseMeaning = structuredMeanings.length ? "" : collectChineseMeanings(result);
+  logTeacherDebug("provider", "browser-provider:parse:extracted", {
+    text: draft.text,
+    structuredMeanings,
+    chineseMeaning,
+    phoneticSymbol: collectPhoneticSymbol(result),
+  });
   if (!structuredMeanings.length && !chineseMeaning) return draft;
 
   return {
@@ -288,8 +331,24 @@ export function parseBaiduBrowserTranslateResponse(response: unknown, draft: Ter
 }
 
 export async function baiduBrowserTranslateTerm(draft: TermDraft, options: BaiduBrowserTranslateOptions = {}) {
+  logTeacherDebug("provider", "browser-provider:translate:before", {
+    text: draft.text,
+    termType: draft.termType,
+    timeoutMs: getTimeout(options),
+    injectedTranslator: Boolean(options.translateInBrowser),
+  });
   const response = options.translateInBrowser
     ? await options.translateInBrowser(draft.text)
     : await translateWithBaiduBrowser(draft.text, getTimeout(options));
-  return parseBaiduBrowserTranslateResponse(response, draft);
+  logTeacherDebug("provider", "browser-provider:translate:after", {
+    text: draft.text,
+    response: summarizeBrowserResponse(response),
+  });
+  const parsedDraft = parseBaiduBrowserTranslateResponse(response, draft);
+  logTeacherDebug("provider", "browser-provider:translate:parsed", {
+    text: parsedDraft.text,
+    phoneticSymbol: parsedDraft.phoneticSymbol,
+    meanings: parsedDraft.meanings,
+  });
+  return parsedDraft;
 }
