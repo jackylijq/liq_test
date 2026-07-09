@@ -9,6 +9,16 @@ export type TeacherGroupOption = {
   sortOrder: number;
 };
 
+export type TeacherUnitFilter = {
+  id: string;
+  name: string;
+  categories: Array<{
+    id: string;
+    name: string;
+    rawName: string;
+  }>;
+};
+
 export type TeacherTermForSummary = {
   termType: string;
   meanings: Array<{
@@ -31,6 +41,8 @@ export function summarizeTeacherTerms(terms: TeacherTermForSummary[]) {
     (summary, term) => {
       if (term.termType === "phrase") {
         summary.phraseCount += 1;
+      } else if (term.termType === "sentence") {
+        summary.sentenceCount += 1;
       } else {
         summary.wordCount += 1;
       }
@@ -45,17 +57,21 @@ export function summarizeTeacherTerms(terms: TeacherTermForSummary[]) {
 
       return summary;
     },
-    { wordCount: 0, phraseCount: 0, missingFieldCount: 0 },
+    { wordCount: 0, phraseCount: 0, sentenceCount: 0, missingFieldCount: 0 },
   );
 }
 
 export async function getTeacherGroups(): Promise<TeacherGroupOption[]> {
   await ensureDefaultTeacherGroups();
   const groups = await prisma.group.findMany({
+    where: {
+      parentId: null,
+      name: { in: defaultGradeGroupNames },
+    },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     select: { id: true, name: true, parentId: true, sortOrder: true },
   });
-  return flattenTeacherGroups(groups);
+  return groups.map((group) => ({ ...group, rawName: group.name }));
 }
 
 export async function getTeacherGroupTerms(groupId: string) {
@@ -64,6 +80,36 @@ export async function getTeacherGroupTerms(groupId: string) {
     include: { meanings: true },
     orderBy: [{ termType: "asc" }, { text: "asc" }],
   });
+}
+
+export async function getTeacherContentOutline(gradeGroupId: string): Promise<TeacherUnitFilter[]> {
+  const units = await prisma.group.findMany({
+    where: { parentId: gradeGroupId },
+    include: {
+      children: {
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      },
+    },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+
+  return units.map((unit) => ({
+    id: unit.id,
+    name: unit.name,
+    categories: unit.children.map((category) => ({
+      id: category.id,
+      rawName: category.name,
+      name: formatTeacherCategoryName(category.name),
+    })),
+  }));
+}
+
+export function formatTeacherCategoryName(name: string) {
+  return name
+    .replace(/\s*基础过关\s*/g, " ")
+    .replace(/\s+-\s+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function ensureDefaultTeacherGroups() {
@@ -85,36 +131,4 @@ async function ensureDefaultTeacherGroups() {
       });
     }
   }
-}
-
-function flattenTeacherGroups(
-  groups: Array<{ id: string; name: string; parentId: string | null; sortOrder: number }>,
-): TeacherGroupOption[] {
-  const childrenByParent = new Map<string | null, typeof groups>();
-  for (const group of groups) {
-    const children = childrenByParent.get(group.parentId) ?? [];
-    children.push(group);
-    childrenByParent.set(group.parentId, children);
-  }
-
-  for (const children of childrenByParent.values()) {
-    children.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
-  }
-
-  const flattened: TeacherGroupOption[] = [];
-
-  function visit(parentId: string | null, parentPath: string[]) {
-    for (const group of childrenByParent.get(parentId) ?? []) {
-      const path = parentId ? [...parentPath, group.name] : [];
-      flattened.push({
-        ...group,
-        rawName: group.name,
-        name: path.length ? path.join(" / ") : group.name,
-      });
-      visit(group.id, path);
-    }
-  }
-
-  visit(null, []);
-  return flattened;
 }

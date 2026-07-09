@@ -1,4 +1,4 @@
-export type TermType = "word" | "phrase";
+export type TermType = "word" | "phrase" | "sentence";
 export type FieldSource = "parsed" | "ai_generated" | "mock_generated" | "web_lookup" | "edited";
 
 export type MeaningFieldName =

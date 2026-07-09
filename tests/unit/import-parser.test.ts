@@ -22,7 +22,7 @@ describe("parseImportedText", () => {
     expect(rows[0].meanings[0].chineseMeaning).toBe("照顾");
   });
 
-  it("parses textbook markdown by section instead of treating headings and sentences as terms", () => {
+  it("parses textbook markdown by section without treating headings as terms", () => {
     const rows = parseImportedText(`# 七年级英语校本教材
 
 #### 重点词汇
@@ -58,15 +58,16 @@ describe("parseImportedText", () => {
       { text: "fox", type: "word", pos: "noun" },
       { text: "care", type: "word", pos: "noun/verb" },
       { text: "take care of", type: "phrase", pos: undefined },
+      { text: "fox — (复数) foxes", type: "sentence", pos: undefined },
       { text: "come from", type: "phrase", pos: undefined },
+      { text: "—Why do you like penguins so much? —Because they are very cute!", type: "sentence", pos: undefined },
+      { text: "They can't fly like other birds, but they can swim very fast.", type: "sentence", pos: undefined },
       { text: "save", type: "word", pos: "verb" },
       { text: "luck", type: "word", pos: "noun" },
       { text: "however", type: "word", pos: "adverb" },
       { text: "Thai", type: "word", pos: "adjective/noun" },
     ]);
     expect(rows.map((row) => row.text)).not.toContain("####");
-    expect(rows.map((row) => row.text)).not.toContain("fox —");
-    expect(rows.some((row) => row.text.includes("Why do you like penguins"))).toBe(false);
   });
 
   it("keeps textbook markdown unit and section category paths on imported terms", () => {
@@ -79,8 +80,14 @@ describe("parseImportedText", () => {
 #### 重点词汇
 - fox n.
 
+#### 词性变化
+- fox — (复数) foxes
+
 #### 必会词块
 - take care of
+
+#### 重点句型
+- I like the way they walk.
 
 ### Section B 基础过关
 
@@ -90,7 +97,9 @@ describe("parseImportedText", () => {
 
     expect(rows.map((row) => ({ text: row.text, categoryPath: row.categoryPath }))).toEqual([
       { text: "fox", categoryPath: ["Unit 1 Animal Friends", "Section A 基础过关 - 重点词汇"] },
+      { text: "fox — (复数) foxes", categoryPath: ["Unit 1 Animal Friends", "Section A 基础过关 - 词性变化"] },
       { text: "take care of", categoryPath: ["Unit 1 Animal Friends", "Section A 基础过关 - 必会词块"] },
+      { text: "I like the way they walk.", categoryPath: ["Unit 1 Animal Friends", "Section A 基础过关 - 重点句型"] },
       { text: "save", categoryPath: ["Unit 1 Animal Friends", "Section B 基础过关 - 重点单词"] },
     ]);
   });

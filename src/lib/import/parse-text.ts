@@ -508,10 +508,29 @@ function parseLine(line: string, context: ParseContext = {}): TermDraft | undefi
   };
 }
 
+function parseSentenceLine(line: string): TermDraft | undefined {
+  const sentence = stripNumberPrefix(stripMarkdownListPrefix(line)).trim();
+  if (!sentence || !/[A-Za-z]/.test(sentence)) return undefined;
+
+  return {
+    text: sentence,
+    termType: "sentence",
+    meanings: [
+      {
+        chineseMeaning: "",
+        exampleSentence: sentence,
+        fieldSources: {
+          exampleSentence: "parsed",
+        },
+      },
+    ],
+  };
+}
+
 function classifyHeading(line: string): ParseMode | undefined {
   const heading = line.replace(/^#{1,6}\s*/, "").replace(/^[一二三四五六七八九十]+[、.．]\s*/, "").trim();
   if (/句型|句式/.test(heading)) return "sentence";
-  if (/词性变化|词形变化|词形转换|词形|单词变形|单词变化/.test(heading)) return "ignore";
+  if (/词性变化|词形变化|词形转换|词形|单词变形|单词变化/.test(heading)) return "sentence";
   if (/短语|词块/.test(heading)) return "phrase";
   if (/单词|词汇/.test(heading)) return "word";
   return undefined;
@@ -546,6 +565,8 @@ function classifyPlainLine(line: string): ParseMode | "skip" | undefined {
   if (/校本教材/.test(heading)) return "skip";
   if (/^Unit\d+/i.test(heading)) return "skip";
   if (/^Section[A-Z]/i.test(heading)) return "skip";
+  if (/句型|句式/.test(heading)) return "ignore";
+  if (/词性变化|词形变化|词形转换|词形|单词变形|单词变化/.test(heading)) return "ignore";
   return classifyHeading(heading);
 }
 
@@ -612,9 +633,9 @@ export function parseImportedText(text: string): TermDraft[] {
       continue;
     }
 
-    if (context.mode === "sentence" || context.mode === "ignore") continue;
+    if (context.mode === "ignore") continue;
 
-    const row = parseLine(line, context);
+    const row = context.mode === "sentence" ? parseSentenceLine(line) : parseLine(line, context);
     if (row?.text) {
       rows.push({
         ...row,

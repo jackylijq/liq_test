@@ -1,6 +1,30 @@
 import type { TermDraft } from "@/lib/types";
 
 export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
+  if (draft.termType === "sentence") {
+    return {
+      ...draft,
+      phoneticSymbol: undefined,
+      meanings: draft.meanings.length
+        ? draft.meanings.map((meaning) => ({
+            ...meaning,
+            partOfSpeech: undefined,
+            exampleSentence: meaning.exampleSentence ?? draft.text,
+            fieldSources: {
+              ...meaning.fieldSources,
+              exampleSentence: meaning.fieldSources.exampleSentence ?? "parsed",
+            },
+          }))
+        : [
+            {
+              chineseMeaning: "",
+              exampleSentence: draft.text,
+              fieldSources: { exampleSentence: "parsed" },
+            },
+          ],
+    };
+  }
+
   if (draft.termType === "phrase") {
     return {
       ...draft,

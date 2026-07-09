@@ -32,6 +32,7 @@ describe("summarizeTeacherTerms", () => {
     expect(summary).toEqual({
       wordCount: 1,
       phraseCount: 1,
+      sentenceCount: 0,
       missingFieldCount: 3,
     });
   });

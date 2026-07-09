@@ -256,11 +256,17 @@ async function findOrCreateChildGroup(name: string, parentId: string, sortOrder:
   const existing = await prisma.group.findFirst({ where: { name, parentId } });
   if (existing) return existing;
 
-  return prisma.group.create({
-    data: {
-      name,
-      parentId,
-      sortOrder,
-    },
-  });
+  try {
+    return await prisma.group.create({
+      data: {
+        name,
+        parentId,
+        sortOrder,
+      },
+    });
+  } catch (error) {
+    const concurrent = await prisma.group.findFirst({ where: { name, parentId } });
+    if (concurrent) return concurrent;
+    throw error;
+  }
 }

@@ -225,7 +225,8 @@ select {
 }
 
 .teacher-stats span,
-.teacher-tabs a {
+.teacher-unit-tabs a,
+.teacher-filter-tabs a {
   border: 1px solid #dde2ea;
   border-radius: 8px;
   background: #fff;
@@ -242,12 +243,20 @@ select {
   font-weight: 700;
 }
 
-.teacher-tabs {
+.teacher-outline-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.teacher-unit-tabs,
+.teacher-filter-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.teacher-tabs a.active {
+.teacher-unit-tabs a.active,
+.teacher-filter-tabs a.active {
   background: #2563eb;
   color: #fff;
   border-color: #2563eb;

@@ -42,17 +42,12 @@ test("teacher can import into a selected category and view split content", async
   await page.getByRole("button", { name: "确认导入" }).click();
 
   await expect(page.getByRole("heading", { name: "2年级上册" })).toBeVisible();
-  await page.getByRole("link", { name: "短语" }).click();
   await expect(page.getByText("look after", { exact: true })).toBeVisible();
   await expect(page.getByText("常用场景")).toBeVisible();
 });
 
-test("teacher markdown import creates unit and section category filters", async ({ page }) => {
-  const suffix = Date.now();
-  const unitName = `Unit ${suffix} Category`;
-  const leafName = `${unitName} / Section A 基础过关 - 重点词汇`;
-  const term = `codexcategory${suffix}`;
-
+test("teacher markdown import renders units and section filters in the main pane", async ({ page }) => {
+  const unitName = `Unit 1 Animal Friends ${Date.now()}`;
   await page.goto("/teacher");
   await page.getByLabel("粘贴 MD/TXT 导入内容").fill(`# Test Book
 
@@ -61,15 +56,42 @@ test("teacher markdown import creates unit and section category filters", async 
 ### Section A 基础过关
 
 #### 重点词汇
-- ${term} n. 分类词
+- fox n.
+
+#### 词性变化
+- fox — (复数) foxes
+
+#### 必会词块
+- take care of
+
+#### 重点句型
+- I like the way they walk.
+
+### Section B 基础过关
+
+#### 必会词块
+- stay safe
 `);
   await page.getByRole("button", { name: "解析到当前分类" }).click();
   await page.getByRole("button", { name: "确认导入" }).click();
 
-  await expect(page.getByRole("link", { name: unitName, exact: true })).toBeVisible();
-  await page.getByRole("link", { name: leafName, exact: true }).click();
-  await expect(page.getByRole("heading", { name: leafName })).toBeVisible();
-  await expect(page.getByText(term, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("分类大纲").getByRole("link", { name: unitName })).toHaveCount(0);
+  await page.getByLabel("单元筛选").getByRole("link", { name: unitName, exact: true }).click();
+  await expect(page.getByRole("heading", { name: unitName })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Section A-重点词汇", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Section A-词性变化", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Section A-必会词块", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Section A-重点句型", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Section B-必会词块", exact: true })).toBeVisible();
+  await expect(page.getByText("fox", { exact: true })).toBeVisible();
+  await expect(page.getByText("take care of", { exact: true })).toBeVisible();
+  await expect(page.locator(".teacher-term-card strong").getByText("I like the way they walk.", { exact: true })).toBeVisible();
+
+  await page.getByRole("link", { name: "Section A-重点词汇", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Section A-重点词汇" })).toBeVisible();
+  await expect(page.getByText("fox", { exact: true })).toBeVisible();
+  await expect(page.getByText("take care of", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("I like the way they walk.", { exact: true })).toHaveCount(0);
 });
 
 test("preview rows do not emit duplicate key warnings", async ({ page }) => {
