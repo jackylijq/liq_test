@@ -23,7 +23,7 @@ export async function parseImportAction(formData: FormData) {
 
   const enriched =
     parsedImport.mode === "source"
-      ? await Promise.all(parsed.map((row) => enrichTermDraft(row, { useBrowser: shouldUseBrowserForSourceImport(row) })))
+      ? await Promise.all(parsed.map((row) => enrichTermDraft(row, { useBrowser: shouldUseBrowserForSourceImport(row, { rowCount: parsed.length }) })))
       : parsed;
   const batch = await prisma.importBatch.create({
     data: {

@@ -50,12 +50,16 @@ export function getTeacherImportMode(fileName: string | null | undefined, mimeTy
   return "source";
 }
 
-export function shouldUseBrowserForSourceImport(row: TermDraft) {
+export function shouldUseBrowserForSourceImport(row: TermDraft, options: { rowCount?: number } = {}) {
   if (row.termType !== "word") return false;
-  if (!row.phoneticSymbol) return false;
 
-  const normalizedPhonetic = row.phoneticSymbol.replace(/^\/|\/$/g, "").trim().toLowerCase();
-  return normalizedPhonetic === row.text.trim().toLowerCase();
+  if (row.phoneticSymbol) {
+    const normalizedPhonetic = row.phoneticSymbol.replace(/^\/|\/$/g, "").trim().toLowerCase();
+    if (normalizedPhonetic === row.text.trim().toLowerCase()) return true;
+  }
+
+  const hasChineseMeaning = row.meanings.some((meaning) => meaning.chineseMeaning.trim());
+  return options.rowCount === 1 && !hasChineseMeaning;
 }
 
 export function buildSupplementDrafts(parsedRows: TermDraft[], existingTerms: ExistingImportTerm[]): TermDraft[] {

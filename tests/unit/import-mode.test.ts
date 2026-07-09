@@ -28,6 +28,32 @@ describe("shouldUseBrowserForSourceImport", () => {
     ).toBe(true);
   });
 
+  it("uses browser enrichment for a single bare imported word", () => {
+    expect(
+      shouldUseBrowserForSourceImport(
+        {
+          text: "care",
+          termType: "word",
+          meanings: [{ chineseMeaning: "", fieldSources: {} }],
+        },
+        { rowCount: 1 },
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps bulk bare imported words on the fast enrichment path", () => {
+    expect(
+      shouldUseBrowserForSourceImport(
+        {
+          text: "fox",
+          termType: "word",
+          meanings: [{ chineseMeaning: "", fieldSources: {} }],
+        },
+        { rowCount: 20 },
+      ),
+    ).toBe(false);
+  });
+
   it("keeps normal imported phonetics on the fast enrichment path", () => {
     expect(
       shouldUseBrowserForSourceImport({
