@@ -139,7 +139,7 @@ SectionB基础过关
 
     expect(rows.map((row) => ({ text: row.text, type: row.termType, pos: row.meanings[0]?.partOfSpeech, meaning: row.meanings[0]?.chineseMeaning }))).toEqual([
       { text: "fox", type: "word", pos: "noun", meaning: "狐狸" },
-      { text: "care", type: "word", pos: "noun/verb", meaning: "照顾；护理；关心；在乎" },
+      { text: "care", type: "word", pos: "noun", meaning: "照顾；护理" },
       { text: "take care of", type: "phrase", pos: undefined, meaning: "照顾；处理" },
       { text: "come from", type: "phrase", pos: undefined, meaning: "来自" },
       { text: "put up/raise one's hand", type: "phrase", pos: undefined, meaning: "举手" },
@@ -154,6 +154,26 @@ SectionB基础过关
     expect(rows.some((row) => row.text.includes("词性变化"))).toBe(false);
     expect(rows.some((row) => row.text.includes("22.adj"))).toBe(false);
     expect(rows.some((row) => row.text.includes("Why"))).toBe(false);
+    const care = rows.find((row) => row.text === "care");
+    expect(care?.meanings).toMatchObject([
+      { partOfSpeech: "noun", chineseMeaning: "照顾；护理" },
+      { partOfSpeech: "verb", chineseMeaning: "关心；在乎" },
+    ]);
+  });
+
+  it("parses PDF-style sentence and phrase translations from extracted text", () => {
+    const rows = parseImportedText(`必会词块
+1.takecareof照顾；处理
+重点句型
+1.I like the way they walk. 我喜欢它们走路的方式。
+2.你为什么这么喜欢企鹅？ Why do you like penguins so much?
+`);
+
+    expect(rows.map((row) => ({ text: row.text, type: row.termType, meaning: row.meanings[0]?.chineseMeaning }))).toEqual([
+      { text: "take care of", type: "phrase", meaning: "照顾；处理" },
+      { text: "I like the way they walk.", type: "sentence", meaning: "我喜欢它们走路的方式" },
+      { text: "Why do you like penguins so much?", type: "sentence", meaning: "你为什么这么喜欢企鹅" },
+    ]);
   });
 
   it("splits common compact textbook phrase rows from PDF extraction", () => {

@@ -1,4 +1,4 @@
-import type { FieldSource, TermDraft, TermType } from "@/lib/types";
+import type { FieldSource, MeaningDraft, TermDraft, TermType } from "@/lib/types";
 
 const partOfSpeechMap: Record<string, string> = {
   n: "noun",
@@ -25,6 +25,7 @@ type ParseContext = {
   unitHeading?: string;
   sectionHeading?: string;
   bucketHeading?: string;
+  sentenceRequiresTranslation?: boolean;
 };
 
 function detectTermType(text: string, explicitPartOfSpeech?: string, forcedMode?: ParseMode): TermType {
@@ -355,6 +356,77 @@ function cleanChineseMeaning(text: string) {
     .trim();
 }
 
+function cleanSentenceMeaning(text: string) {
+  return cleanChineseMeaning(text).replace(/[。！？!?]+$/g, "").trim();
+}
+
+function parseCompactWordMeanings(
+  firstPartOfSpeech: string | undefined,
+  restText: string,
+  fieldSource: FieldSource,
+): MeaningDraft[] {
+  const meanings: MeaningDraft[] = [];
+  const markerPattern = /(modal|interj|conj|prep|pron|adj|adv|n|v)\./gi;
+  const markers = [...restText.matchAll(markerPattern)];
+
+  if (!markers.length) {
+    return [
+      {
+        partOfSpeech: firstPartOfSpeech,
+        chineseMeaning: cleanChineseMeaning(restText),
+        fieldSources: {
+          partOfSpeech: firstPartOfSpeech ? fieldSource : undefined,
+          chineseMeaning: fieldSource,
+        },
+      },
+    ];
+  }
+
+  const firstMeaning = cleanChineseMeaning(restText.slice(0, markers[0].index));
+  if (firstMeaning) {
+    meanings.push({
+      partOfSpeech: firstPartOfSpeech,
+      chineseMeaning: firstMeaning,
+      fieldSources: {
+        partOfSpeech: firstPartOfSpeech ? fieldSource : undefined,
+        chineseMeaning: fieldSource,
+      },
+    });
+  }
+
+  for (let index = 0; index < markers.length; index += 1) {
+    const marker = markers[index];
+    const nextMarker = markers[index + 1];
+    const partOfSpeech = formatPartOfSpeech(parsePartToken(marker[1]));
+    const start = (marker.index ?? 0) + marker[0].length;
+    const end = nextMarker?.index ?? restText.length;
+    const chineseMeaning = cleanChineseMeaning(restText.slice(start, end));
+    if (!chineseMeaning) continue;
+
+    meanings.push({
+      partOfSpeech,
+      chineseMeaning,
+      fieldSources: {
+        partOfSpeech: partOfSpeech ? fieldSource : undefined,
+        chineseMeaning: fieldSource,
+      },
+    });
+  }
+
+  return meanings.length
+    ? meanings
+    : [
+        {
+          partOfSpeech: firstPartOfSpeech,
+          chineseMeaning: cleanChineseMeaning(restText),
+          fieldSources: {
+            partOfSpeech: firstPartOfSpeech ? fieldSource : undefined,
+            chineseMeaning: fieldSource,
+          },
+        },
+      ];
+}
+
 function parseCompactLine(line: string, context: ParseContext): TermDraft | undefined {
   const compact = stripNumberPrefix(stripMarkdownListPrefix(line)).trim();
   if (!compact || !/[A-Za-z]/.test(compact)) return undefined;
@@ -400,20 +472,24 @@ function parseCompactLine(line: string, context: ParseContext): TermDraft | unde
         .map((match) => partOfSpeechMap[normalizePartToken(match[1])])
         .filter((part): part is string => Boolean(part));
       const partOfSpeech = formatPartOfSpeech([...inlineParts, ...restParts].filter(Boolean));
+      const firstPartOfSpeech = formatPartOfSpeech(inlineParts.filter(Boolean));
 
       return {
         text: englishFirst[1],
         termType: "word",
-        meanings: [
-          {
-            partOfSpeech,
-            chineseMeaning: cleanChineseMeaning(englishFirst[3]),
-            fieldSources: {
-              partOfSpeech: partOfSpeech ? fieldSource : undefined,
-              chineseMeaning: fieldSource,
-            },
-          },
-        ],
+        meanings:
+          restParts.length > 0
+            ? parseCompactWordMeanings(firstPartOfSpeech, englishFirst[3], fieldSource)
+            : [
+                {
+                  partOfSpeech,
+                  chineseMeaning: cleanChineseMeaning(englishFirst[3]),
+                  fieldSources: {
+                    partOfSpeech: partOfSpeech ? fieldSource : undefined,
+                    chineseMeaning: fieldSource,
+                  },
+                },
+              ],
       };
     }
 
@@ -508,9 +584,48 @@ function parseLine(line: string, context: ParseContext = {}): TermDraft | undefi
   };
 }
 
-function parseSentenceLine(line: string): TermDraft | undefined {
+function parseSentenceLine(line: string, options: { requireTranslation?: boolean } = {}): TermDraft | undefined {
   const sentence = stripNumberPrefix(stripMarkdownListPrefix(line)).trim();
   if (!sentence || !/[A-Za-z]/.test(sentence)) return undefined;
+
+  const fieldSource: FieldSource = "parsed";
+  const englishFirst = sentence.match(/^([A-Za-z][^。！？!?]*[.!?])\s*([\u4e00-\u9fa5].*)$/);
+  if (englishFirst) {
+    return {
+      text: englishFirst[1].trim(),
+      termType: "sentence",
+      meanings: [
+        {
+          chineseMeaning: cleanSentenceMeaning(englishFirst[2]),
+          exampleSentence: englishFirst[1].trim(),
+          fieldSources: {
+            chineseMeaning: fieldSource,
+            exampleSentence: fieldSource,
+          },
+        },
+      ],
+    };
+  }
+
+  const chineseFirst = sentence.match(/^([\u4e00-\u9fa5“”‘’"'，。！？!?、；：\s]+)\s*([A-Za-z].*[.!?])$/);
+  if (chineseFirst) {
+    return {
+      text: chineseFirst[2].trim(),
+      termType: "sentence",
+      meanings: [
+        {
+          chineseMeaning: cleanSentenceMeaning(chineseFirst[1]),
+          exampleSentence: chineseFirst[2].trim(),
+          fieldSources: {
+            chineseMeaning: fieldSource,
+            exampleSentence: fieldSource,
+          },
+        },
+      ],
+    };
+  }
+
+  if (options.requireTranslation) return undefined;
 
   return {
     text: sentence,
@@ -565,7 +680,7 @@ function classifyPlainLine(line: string): ParseMode | "skip" | undefined {
   if (/校本教材/.test(heading)) return "skip";
   if (/^Unit\d+/i.test(heading)) return "skip";
   if (/^Section[A-Z]/i.test(heading)) return "skip";
-  if (/句型|句式/.test(heading)) return "ignore";
+  if (/句型|句式/.test(heading)) return "sentence";
   if (/词性变化|词形变化|词形转换|词形|单词变形|单词变化/.test(heading)) return "ignore";
   return classifyHeading(heading);
 }
@@ -616,6 +731,7 @@ export function parseImportedText(text: string): TermDraft[] {
 
       context.mode = classifyHeading(line);
       context.partOfSpeech = undefined;
+      context.sentenceRequiresTranslation = false;
       continue;
     }
 
@@ -630,12 +746,16 @@ export function parseImportedText(text: string): TermDraft[] {
         context.mode = plainMode;
       }
       context.partOfSpeech = undefined;
+      context.sentenceRequiresTranslation = plainMode === "sentence";
       continue;
     }
 
     if (context.mode === "ignore") continue;
 
-    const row = context.mode === "sentence" ? parseSentenceLine(line) : parseLine(line, context);
+    const row =
+      context.mode === "sentence"
+        ? parseSentenceLine(line, { requireTranslation: context.sentenceRequiresTranslation })
+        : parseLine(line, context);
     if (row?.text) {
       rows.push({
         ...row,

@@ -77,4 +77,37 @@ describe("buildSupplementDrafts", () => {
       },
     ]);
   });
+
+  it("uses translated sentence rows from supplement imports", () => {
+    const matched = buildSupplementDrafts(
+      [
+        {
+          text: "Why do you like penguins so much?",
+          termType: "sentence",
+          meanings: [
+            {
+              chineseMeaning: "你为什么这么喜欢企鹅",
+              exampleSentence: "Why do you like penguins so much?",
+              fieldSources: { chineseMeaning: "parsed", exampleSentence: "parsed" },
+            },
+          ],
+        },
+      ],
+      [
+        {
+          text: "Why do you like penguins so much?",
+          normalizedText: "why do you like penguins so much?",
+          termType: "sentence",
+        },
+      ],
+    );
+
+    expect(matched[0]).toMatchObject({
+      text: "Why do you like penguins so much?",
+      termType: "sentence",
+      meanings: [{ chineseMeaning: "你为什么这么喜欢企鹅" }],
+    });
+    expect(matched[0].meanings[0].partOfSpeech).toBeUndefined();
+    expect(matched[0].phoneticSymbol).toBeUndefined();
+  });
 });

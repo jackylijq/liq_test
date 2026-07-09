@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatChineseMeaningLine, formatPartOfSpeech, getMeaningLines, shouldShowUsageContext } from "@/lib/terms/display";
+import {
+  formatChineseMeaningLine,
+  formatPartOfSpeech,
+  getMeaningLines,
+  shouldShowExampleSentence,
+  shouldShowUsageContext,
+} from "@/lib/terms/display";
 
 describe("term display formatting", () => {
   it("uses short part-of-speech labels for word meanings", () => {
@@ -21,9 +27,30 @@ describe("term display formatting", () => {
     ).toEqual(["v.：照顾"]);
   });
 
+  it("filters mock placeholder Chinese meanings", () => {
+    expect(
+      getMeaningLines(
+        "word",
+        [
+          {
+            partOfSpeech: "noun/verb",
+            chineseMeaning: "care 的中文意思",
+            fieldSourcesJson: '{"chineseMeaning":"mock_generated"}',
+          },
+        ],
+        "care",
+      ),
+    ).toEqual([]);
+  });
+
   it("hides mock-generated usage context but keeps imported usage context", () => {
     expect(shouldShowUsageContext({ usageContext: "" })).toBe(false);
     expect(shouldShowUsageContext({ usageContext: "常用场景：日常表达", fieldSourcesJson: '{"usageContext":"mock_generated"}' })).toBe(false);
     expect(shouldShowUsageContext({ usageContext: "常用场景：日常表达", fieldSourcesJson: '{"usageContext":"parsed"}' })).toBe(true);
+  });
+
+  it("does not show a sentence example when it repeats the term text", () => {
+    expect(shouldShowExampleSentence("sentence", "I like the way they walk.", "I like the way they walk.")).toBe(false);
+    expect(shouldShowExampleSentence("word", "care", "Take care of yourself.")).toBe(true);
   });
 });
