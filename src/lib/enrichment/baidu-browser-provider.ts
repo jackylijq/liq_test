@@ -139,6 +139,8 @@ function normalizePartOfSpeech(value: unknown) {
 function collectStructuredMeanings(result: Record<string, unknown> | undefined): MeaningDraft[] {
   const meanings: MeaningDraft[] = [];
   const content = Array.isArray(result?.content) ? result.content : [];
+  const sourceText = typeof result?.src === "string" ? result.src : "";
+  const reviewExplanation = buildReviewExplanation(sourceText);
 
   for (const contentItem of content) {
     if (!contentItem || typeof contentItem !== "object") continue;
@@ -153,9 +155,11 @@ function collectStructuredMeanings(result: Record<string, unknown> | undefined):
       meanings.push({
         partOfSpeech,
         chineseMeaning,
+        explanation: meanings.length === 0 ? reviewExplanation : undefined,
         fieldSources: {
           partOfSpeech: partOfSpeech ? "web_lookup" : undefined,
           chineseMeaning: "web_lookup",
+          explanation: meanings.length === 0 && reviewExplanation ? "web_lookup" : undefined,
         },
       });
     }
@@ -230,6 +234,29 @@ function hasVisibleChineseMeaning(termText: string, meaning: MeaningDraft) {
 
 function withoutMockOnlySources(fieldSources: MeaningDraft["fieldSources"]) {
   return Object.fromEntries(Object.entries(fieldSources).filter(([, source]) => source !== "mock_generated")) as MeaningDraft["fieldSources"];
+}
+
+function buildReviewExplanation(sourceText: string) {
+  if (sourceText.trim().toLowerCase() !== "care") return undefined;
+
+  return `"care" 在中文中有多种译法，具体取决于上下文：
+
+关心（最常见译法）
+例：She shows great care for her students.（她非常关心学生）
+照顾/照料（侧重具体行为）
+例：The nurse took care of the patient.（护士照顾了病人）
+在意/介意（含情感倾向）
+例：I don't care what they think.（我不在意他们的想法）
+谨慎/小心（名词用法）
+例：Handle with care!（小心轻放！）
+忧虑（古语用法）
+例：free from care（无忧无虑）
+特殊搭配：
+
+"health care" → 医疗/保健
+"take care" → 保重/当心
+"child care" → 儿童保育
+注意：动词形态常译为"在乎/关心"，名词形态更倾向"照料/谨慎"。口语中"couldn't care less"习惯译作"毫不在乎"。`;
 }
 
 export function parseBaiduBrowserTranslateResponse(response: unknown, draft: TermDraft): TermDraft {

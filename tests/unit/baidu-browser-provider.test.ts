@@ -43,6 +43,7 @@ describe("parseBaiduBrowserTranslateResponse", () => {
       {
         partOfSpeech: "noun",
         chineseMeaning: "照顾，照料；保养，护理；小心，谨慎；关心",
+        explanation: expect.stringContaining("She shows great care for her students."),
         fieldSources: { partOfSpeech: "web_lookup", chineseMeaning: "web_lookup" },
       },
       {
@@ -51,6 +52,8 @@ describe("parseBaiduBrowserTranslateResponse", () => {
         fieldSources: { partOfSpeech: "web_lookup", chineseMeaning: "web_lookup" },
       },
     ]);
+    expect(parsed.meanings[0].explanation).toContain("health care");
+    expect(parsed.meanings[0].explanation).toContain("couldn't care less");
   });
 
   it("parses browser v2Fetch phrase meanings", () => {
