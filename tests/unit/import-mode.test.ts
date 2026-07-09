@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSupplementDrafts, getTeacherImportMode } from "@/lib/import/import-mode";
+import { buildSupplementDrafts, getTeacherImportMode, shouldUseBrowserForSourceImport } from "@/lib/import/import-mode";
 import type { TermDraft } from "@/lib/types";
 
 describe("getTeacherImportMode", () => {
@@ -13,6 +13,30 @@ describe("getTeacherImportMode", () => {
     expect(getTeacherImportMode("answers.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe(
       "supplement",
     );
+  });
+});
+
+describe("shouldUseBrowserForSourceImport", () => {
+  it("uses browser enrichment for imported words with placeholder phonetics", () => {
+    expect(
+      shouldUseBrowserForSourceImport({
+        text: "care",
+        termType: "word",
+        phoneticSymbol: "/care/",
+        meanings: [{ partOfSpeech: "noun", chineseMeaning: "照顾", fieldSources: { chineseMeaning: "parsed" } }],
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps normal imported phonetics on the fast enrichment path", () => {
+    expect(
+      shouldUseBrowserForSourceImport({
+        text: "apple",
+        termType: "word",
+        phoneticSymbol: "/ˈæpəl/",
+        meanings: [{ partOfSpeech: "noun", chineseMeaning: "苹果", fieldSources: { chineseMeaning: "parsed" } }],
+      }),
+    ).toBe(false);
   });
 });
 

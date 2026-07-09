@@ -50,6 +50,14 @@ export function getTeacherImportMode(fileName: string | null | undefined, mimeTy
   return "source";
 }
 
+export function shouldUseBrowserForSourceImport(row: TermDraft) {
+  if (row.termType !== "word") return false;
+  if (!row.phoneticSymbol) return false;
+
+  const normalizedPhonetic = row.phoneticSymbol.replace(/^\/|\/$/g, "").trim().toLowerCase();
+  return normalizedPhonetic === row.text.trim().toLowerCase();
+}
+
 export function buildSupplementDrafts(parsedRows: TermDraft[], existingTerms: ExistingImportTerm[]): TermDraft[] {
   const existingByText = new Map<string, ExistingImportTerm[]>();
   for (const term of existingTerms) {

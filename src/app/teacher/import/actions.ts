@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { enrichTermDraft } from "@/lib/enrichment/provider";
 import { extractDocxText } from "@/lib/import/parse-docx";
-import { buildSupplementDrafts, getTeacherImportMode, type TeacherImportMode } from "@/lib/import/import-mode";
+import { buildSupplementDrafts, getTeacherImportMode, shouldUseBrowserForSourceImport, type TeacherImportMode } from "@/lib/import/import-mode";
 import { parseImportedText } from "@/lib/import/parse-text";
 import { extractPdfText } from "@/lib/import/parse-pdf";
 import { prisma } from "@/lib/db";
@@ -21,7 +21,10 @@ export async function parseImportAction(formData: FormData) {
     redirect(`/teacher?groupId=${targetGroup.id}&error=empty-import`);
   }
 
-  const enriched = parsedImport.mode === "source" ? await Promise.all(parsed.map((row) => enrichTermDraft(row))) : parsed;
+  const enriched =
+    parsedImport.mode === "source"
+      ? await Promise.all(parsed.map((row) => enrichTermDraft(row, { useBrowser: shouldUseBrowserForSourceImport(row) })))
+      : parsed;
   const batch = await prisma.importBatch.create({
     data: {
       sourceType: parsedImport.mode,
