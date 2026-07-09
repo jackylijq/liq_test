@@ -6,7 +6,7 @@ import {
   selectTeacherGroup,
   summarizeTeacherTerms,
 } from "@/lib/teacher/groups";
-import { getMeaningLines, shouldShowExampleSentence, shouldShowUsageContext } from "@/lib/terms/display";
+import { getMeaningLines, getVisibleExampleSentences, getVisibleExplanations, shouldShowUsageContext } from "@/lib/terms/display";
 
 type TeacherPageProps = {
   searchParams: Promise<{ groupId?: string; unitId?: string; categoryId?: string; error?: string }>;
@@ -120,12 +120,12 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
                 {getMeaningLines(term.termType, term.meanings, term.text).map((line, index) => (
                   <p key={`${term.id}-meaning-${index}`}>{line}</p>
                 ))}
-                {term.termType === "word" && shouldShowExampleSentence(term.termType, term.text, term.meanings[0]?.exampleSentence) ? (
-                  <p>{term.meanings[0].exampleSentence}</p>
-                ) : null}
-                {term.termType === "sentence" && shouldShowExampleSentence(term.termType, term.text, term.meanings[0]?.exampleSentence) ? (
-                  <p>{term.meanings[0].exampleSentence}</p>
-                ) : null}
+                {getVisibleExampleSentences(term.termType, term.text, term.meanings).map((sentence, index) => (
+                  <p key={`${term.id}-example-${index}`}>{sentence}</p>
+                ))}
+                {getVisibleExplanations(term.meanings).map((explanation, index) => (
+                  <p key={`${term.id}-explanation-${index}`}>{explanation}</p>
+                ))}
                 {term.meanings.map((meaning, index) =>
                   shouldShowUsageContext(meaning) ? <p key={`${term.id}-usage-${index}`}>{meaning.usageContext}</p> : null,
                 )}

@@ -23,7 +23,9 @@ export function formatPartOfSpeech(partOfSpeech: string | null | undefined) {
 type DisplayMeaning = {
   partOfSpeech?: string | null;
   chineseMeaning: string;
-  fieldSources?: { chineseMeaning?: string };
+  exampleSentence?: string | null;
+  explanation?: string | null;
+  fieldSources?: { chineseMeaning?: string; explanation?: string; exampleSentence?: string };
   fieldSourcesJson?: string | null;
 };
 
@@ -56,7 +58,7 @@ export function formatChineseMeaningLine(termType: TermType | string, meaning: D
 }
 
 export function getMeaningLines(termType: TermType | string, meanings: DisplayMeaning[], termText?: string) {
-  return meanings.map((meaning) => formatChineseMeaningLine(termType, meaning, termText)).filter(Boolean);
+  return [...new Set(meanings.map((meaning) => formatChineseMeaningLine(termType, meaning, termText)).filter(Boolean))];
 }
 
 export function shouldShowExampleSentence(termType: TermType | string, termText: string, exampleSentence?: string | null) {
@@ -75,4 +77,32 @@ export function shouldShowUsageContext(meaning: { usageContext?: string | null; 
   } catch {
     return true;
   }
+}
+
+export function shouldShowExplanation(meaning: { explanation?: string | null; fieldSources?: { explanation?: string }; fieldSourcesJson?: string | null }) {
+  if (!meaning.explanation?.trim()) return false;
+  if (meaning.fieldSources?.explanation) return meaning.fieldSources.explanation !== "mock_generated";
+  if (!meaning.fieldSourcesJson) return true;
+
+  try {
+    const fieldSources = JSON.parse(meaning.fieldSourcesJson) as { explanation?: string };
+    return fieldSources.explanation !== "mock_generated";
+  } catch {
+    return true;
+  }
+}
+
+export function getVisibleExampleSentences(termType: TermType | string, termText: string, meanings: DisplayMeaning[]) {
+  const examples = meanings
+    .map((meaning) => meaning.exampleSentence?.trim())
+    .filter((sentence): sentence is string => Boolean(sentence && shouldShowExampleSentence(termType, termText, sentence)));
+  return [...new Set(examples)];
+}
+
+export function getVisibleExplanations(meanings: DisplayMeaning[]) {
+  const explanations = meanings
+    .filter((meaning) => shouldShowExplanation(meaning))
+    .map((meaning) => meaning.explanation?.trim())
+    .filter((explanation): explanation is string => Boolean(explanation));
+  return [...new Set(explanations)];
 }

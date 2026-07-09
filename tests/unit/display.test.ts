@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   formatChineseMeaningLine,
+  getVisibleExampleSentences,
+  getVisibleExplanations,
   formatPartOfSpeech,
   getMeaningLines,
+  shouldShowExplanation,
   shouldShowExampleSentence,
   shouldShowUsageContext,
 } from "@/lib/terms/display";
@@ -52,5 +55,26 @@ describe("term display formatting", () => {
   it("does not show a sentence example when it repeats the term text", () => {
     expect(shouldShowExampleSentence("sentence", "I like the way they walk.", "I like the way they walk.")).toBe(false);
     expect(shouldShowExampleSentence("word", "care", "Take care of yourself.")).toBe(true);
+  });
+
+  it("collects unique examples and hides mock explanations", () => {
+    const meanings = [
+      {
+        chineseMeaning: "照顾",
+        exampleSentence: "She shows great care for her students.",
+        explanation: "care is used as a common English word.",
+        fieldSourcesJson: '{"explanation":"mock_generated"}',
+      },
+      {
+        chineseMeaning: "关心",
+        exampleSentence: "She shows great care for her students.",
+        explanation: "用于表示关心或照顾。",
+        fieldSourcesJson: '{"explanation":"web_lookup"}',
+      },
+    ];
+
+    expect(getVisibleExampleSentences("word", "care", meanings)).toEqual(["She shows great care for her students."]);
+    expect(shouldShowExplanation(meanings[0])).toBe(false);
+    expect(getVisibleExplanations(meanings)).toEqual(["用于表示关心或照顾。"]);
   });
 });

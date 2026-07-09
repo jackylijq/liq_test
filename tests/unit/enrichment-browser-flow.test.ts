@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { TermDraft } from "@/lib/types";
 
 vi.mock("@/lib/enrichment/baidu-translate-provider", () => ({
-  baiduTranslateEnrichTerm: vi.fn(async (draft: TermDraft) => draft),
+  baiduTranslateEnrichTerm: vi.fn(async (draft: TermDraft) => ({
+    ...draft,
+    meanings: [{ chineseMeaning: "短释义", fieldSources: { chineseMeaning: "web_lookup" } }],
+  })),
 }));
 
 vi.mock("@/lib/enrichment/baidu-browser-provider", () => ({
@@ -13,7 +16,7 @@ vi.mock("@/lib/enrichment/baidu-browser-provider", () => ({
 }));
 
 describe("enrichTermDraft browser fallback", () => {
-  it("uses browser-session Baidu translation when HTTP Baidu has no meaning", async () => {
+  it("uses browser-session Baidu translation during manual enrichment even when HTTP Baidu has a short meaning", async () => {
     const { enrichTermDraft } = await import("@/lib/enrichment/provider");
     const { baiduBrowserTranslateTerm } = await import("@/lib/enrichment/baidu-browser-provider");
 

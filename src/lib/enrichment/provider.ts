@@ -17,7 +17,7 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
 
   try {
     baiduDraft = await baiduTranslateEnrichTerm(draft);
-    if (hasWebLookupMeaning(baiduDraft)) {
+    if (!options.useBrowser && hasWebLookupMeaning(baiduDraft)) {
       return await mockEnrichTerm(baiduDraft);
     }
   } catch {

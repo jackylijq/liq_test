@@ -80,7 +80,7 @@ async function saveEnrichedTerm(term: DbTerm, draft: TermDraft) {
       await prisma.termMeaning.update({
         where: { id: existing.id },
         data: {
-          chineseMeaning: existing.chineseMeaning.trim() || meaning.chineseMeaning,
+          chineseMeaning: shouldReplaceChineseMeaning(existing, meaning) ? meaning.chineseMeaning : existing.chineseMeaning,
           exampleSentence: existing.exampleSentence ?? meaning.exampleSentence ?? null,
           explanation: existing.explanation ?? meaning.explanation ?? null,
           usageContext: existing.usageContext ?? meaning.usageContext ?? null,
@@ -112,6 +112,18 @@ function findExistingMeaning(existingMeanings: DbTerm["meanings"], meaning: Mean
     existingMeanings.find((saved) => meaning.partOfSpeech && saved.partOfSpeech === meaning.partOfSpeech) ??
     existingMeanings.find((saved) => saved.chineseMeaning.trim() === meaning.chineseMeaning.trim())
   );
+}
+
+function shouldReplaceChineseMeaning(existing: DbTerm["meanings"][number], meaning: MeaningDraft) {
+  const existingText = existing.chineseMeaning.trim();
+  const incomingText = meaning.chineseMeaning.trim();
+  if (!incomingText) return false;
+  if (!existingText) return true;
+
+  const existingSources = parseFieldSourcesJson(existing.fieldSourcesJson);
+  if (existingSources.chineseMeaning === "mock_generated") return true;
+  if (meaning.fieldSources.chineseMeaning !== "web_lookup") return false;
+  return incomingText.length > existingText.length;
 }
 
 function hasMeaningContent(meaning: MeaningDraft) {

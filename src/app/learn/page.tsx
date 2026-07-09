@@ -5,7 +5,7 @@ import {
   getTeacherGroupTerms,
   selectTeacherGroup,
 } from "@/lib/teacher/groups";
-import { getMeaningLines, shouldShowExampleSentence, shouldShowUsageContext } from "@/lib/terms/display";
+import { getMeaningLines, getVisibleExampleSentences, getVisibleExplanations, shouldShowUsageContext } from "@/lib/terms/display";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +83,12 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
                   {getMeaningLines(term.termType, term.meanings, term.text).map((line, index) => (
                     <p key={`${term.id}-meaning-${index}`}>{line}</p>
                   ))}
-                  {shouldShowExampleSentence(term.termType, term.text, meaning?.exampleSentence) ? <p>{meaning?.exampleSentence}</p> : null}
+                  {getVisibleExampleSentences(term.termType, term.text, term.meanings).map((sentence, index) => (
+                    <p key={`${term.id}-example-${index}`}>{sentence}</p>
+                  ))}
+                  {getVisibleExplanations(term.meanings).map((explanation, index) => (
+                    <p key={`${term.id}-explanation-${index}`}>{explanation}</p>
+                  ))}
                   {term.meanings.map((item, index) =>
                     shouldShowUsageContext(item) ? <p key={`${term.id}-usage-${index}`}>{item.usageContext}</p> : null,
                   )}

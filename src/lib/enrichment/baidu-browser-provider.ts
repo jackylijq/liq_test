@@ -1,5 +1,6 @@
 import type { Browser, Page } from "playwright";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
+import { buildBaiduTtsUrl } from "./baidu-translate-provider";
 
 type BaiduBrowserTranslateOptions = {
   translateInBrowser?: (text: string) => Promise<unknown>;
@@ -109,6 +110,92 @@ function collectChineseMeanings(result: Record<string, unknown> | undefined) {
   return [...new Set(meanings)].join("；");
 }
 
+const partOfSpeechMap: Record<string, string> = {
+  n: "noun",
+  noun: "noun",
+  v: "verb",
+  verb: "verb",
+  adj: "adjective",
+  adjective: "adjective",
+  adv: "adverb",
+  adverb: "adverb",
+  prep: "preposition",
+  preposition: "preposition",
+  pron: "pronoun",
+  pronoun: "pronoun",
+  conj: "conjunction",
+  conjunction: "conjunction",
+  interj: "interjection",
+  interjection: "interjection",
+  modal: "modal",
+};
+
+function normalizePartOfSpeech(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const key = value.replace(/[.。]/g, "").trim().toLowerCase();
+  return partOfSpeechMap[key] ?? key;
+}
+
+function collectStructuredMeanings(result: Record<string, unknown> | undefined): MeaningDraft[] {
+  const meanings: MeaningDraft[] = [];
+  const content = Array.isArray(result?.content) ? result.content : [];
+
+  for (const contentItem of content) {
+    if (!contentItem || typeof contentItem !== "object") continue;
+    const meanItems = Array.isArray((contentItem as { mean?: unknown }).mean) ? (contentItem as { mean: unknown[] }).mean : [];
+    for (const meanItem of meanItems) {
+      if (!meanItem || typeof meanItem !== "object") continue;
+      const record = meanItem as { pre?: unknown; cont?: unknown };
+      const chineseMeaning = collectContMeanings(record.cont);
+      if (!chineseMeaning) continue;
+
+      const partOfSpeech = normalizePartOfSpeech(record.pre);
+      meanings.push({
+        partOfSpeech,
+        chineseMeaning,
+        fieldSources: {
+          partOfSpeech: partOfSpeech ? "web_lookup" : undefined,
+          chineseMeaning: "web_lookup",
+        },
+      });
+    }
+  }
+
+  return meanings;
+}
+
+function collectContMeanings(cont: unknown) {
+  if (typeof cont === "string") return cont.trim();
+  if (!cont || typeof cont !== "object") return "";
+  return Object.keys(cont).map((item) => item.trim()).filter(Boolean).join("；");
+}
+
+function wrapPhonetic(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("/") || trimmed.startsWith("[")) return `/${trimmed.replace(/^\/|\/$/g, "")}/`;
+  return `/${trimmed}/`;
+}
+
+function collectPhoneticSymbol(result: Record<string, unknown> | undefined) {
+  const voiceItems = Array.isArray(result?.voice) ? result.voice : [];
+  let english = "";
+  let american = "";
+
+  for (const voice of voiceItems) {
+    if (!voice || typeof voice !== "object") continue;
+    const record = voice as { en_phonic?: unknown; us_phonic?: unknown };
+    if (typeof record.en_phonic === "string") english = record.en_phonic;
+    if (typeof record.us_phonic === "string") american = record.us_phonic;
+  }
+
+  const parts = [
+    english ? `英${wrapPhonetic(english)}` : "",
+    american ? `美${wrapPhonetic(american)}` : "",
+  ].filter(Boolean);
+  return parts.join(" ") || undefined;
+}
+
 function fieldSources(): MeaningDraft["fieldSources"] {
   return { chineseMeaning: "web_lookup" };
 }
@@ -136,14 +223,15 @@ export function parseBaiduBrowserTranslateResponse(response: unknown, draft: Ter
   if (baiduResponse.status !== 0 && baiduResponse.errno !== 0) return draft;
 
   const result = parseJsonObject(baiduResponse.result);
-  const chineseMeaning = collectChineseMeanings(result);
-  if (!chineseMeaning) return draft;
+  const structuredMeanings = draft.termType === "word" ? collectStructuredMeanings(result) : [];
+  const chineseMeaning = structuredMeanings.length ? "" : collectChineseMeanings(result);
+  if (!structuredMeanings.length && !chineseMeaning) return draft;
 
   return {
     ...draft,
-    phoneticSymbol: draft.termType === "word" ? draft.phoneticSymbol : undefined,
-    pronunciationUrl: draft.termType === "word" ? draft.pronunciationUrl : undefined,
-    meanings: mergeBrowserMeaning(draft, chineseMeaning),
+    phoneticSymbol: draft.termType === "word" ? (draft.phoneticSymbol ?? collectPhoneticSymbol(result)) : undefined,
+    pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? buildBaiduTtsUrl(draft.text)) : undefined,
+    meanings: structuredMeanings.length ? structuredMeanings : mergeBrowserMeaning(draft, chineseMeaning),
   };
 }
 
