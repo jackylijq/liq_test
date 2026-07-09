@@ -1,29 +1,85 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import {
+  getTeacherContentOutline,
+  getTeacherGroups,
+  getTeacherGroupTerms,
+  selectTeacherGroup,
+} from "@/lib/teacher/groups";
 
 export const dynamic = "force-dynamic";
 
-export default async function LearnPage() {
-  const terms = await prisma.term.findMany({
-    include: { meanings: true },
-    orderBy: { createdAt: "desc" },
-    take: 1,
-  });
-  const term = terms[0];
-  const meaning = term?.meanings[0];
+type LearnPageProps = {
+  searchParams: Promise<{ groupId?: string; unitId?: string; categoryId?: string }>;
+};
+
+export default async function LearnPage({ searchParams }: LearnPageProps) {
+  const params = await searchParams;
+  const groups = await getTeacherGroups();
+  const selectedGroup = selectTeacherGroup(groups, params.groupId);
+  const outline = selectedGroup ? await getTeacherContentOutline(selectedGroup.id) : [];
+  const selectedUnit = outline.find((unit) => unit.id === params.unitId || unit.categories.some((category) => category.id === params.categoryId));
+  const selectedCategory = selectedUnit?.categories.find((category) => category.id === params.categoryId);
+  const contentGroupId = selectedCategory?.id ?? selectedUnit?.id ?? selectedGroup?.id;
+  const terms = contentGroupId ? await getTeacherGroupTerms(contentGroupId) : [];
+  const contentTitle = selectedCategory?.name ?? selectedUnit?.name ?? selectedGroup?.name ?? "学习";
 
   return (
-    <main className="student-layout">
-      <aside className="group-sidebar">1年级上册</aside>
+    <main className="student-layout learn-scroll">
+      <aside className="group-sidebar">
+        <nav className="student-grade-links" aria-label="学习年级">
+          {groups.map((group) => (
+            <Link className={group.id === selectedGroup?.id ? "active" : ""} href={`/learn?groupId=${group.id}`} key={group.id}>
+              {group.name}
+            </Link>
+          ))}
+        </nav>
+      </aside>
       <section className="student-content">
         <h1>学习</h1>
-        {term && meaning ? (
-          <article className="study-card">
-            <h2>{term.text}</h2>
-            <p>{term.termType === "phrase" ? "固定搭配" : `${meaning.partOfSpeech ?? "word"} · 🔊`}</p>
-            <p>{meaning.chineseMeaning}</p>
-            <p>{meaning.exampleSentence}</p>
-          </article>
+        {selectedGroup && outline.length > 0 ? (
+          <section className="student-outline-panel" aria-label="学习内容筛选">
+            <nav className="teacher-unit-tabs" aria-label="学习单元筛选">
+              {outline.map((unit) => (
+                <Link
+                  className={unit.id === selectedUnit?.id ? "active" : ""}
+                  href={`/learn?groupId=${selectedGroup.id}&unitId=${unit.id}`}
+                  key={unit.id}
+                >
+                  {unit.name}
+                </Link>
+              ))}
+            </nav>
+            {selectedUnit ? (
+              <nav className="teacher-filter-tabs" aria-label="学习小类筛选">
+                {selectedUnit.categories.map((category) => (
+                  <Link
+                    className={category.id === selectedCategory?.id ? "active" : ""}
+                    href={`/learn?groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
+                    key={category.id}
+                  >
+                    {category.name}
+                  </Link>
+                ))}
+              </nav>
+            ) : null}
+          </section>
+        ) : null}
+        <h2 className="student-section-title">{contentTitle}</h2>
+        {terms.length > 0 ? (
+          <section className="study-list">
+            {terms.map((term) => {
+              const meaning = term.meanings[0];
+              return (
+                <article className="study-card" key={term.id}>
+                  <h2>{term.text}</h2>
+                  <p>{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
+                  {meaning?.chineseMeaning ? <p>{meaning.chineseMeaning}</p> : null}
+                  {meaning?.exampleSentence && meaning.exampleSentence !== term.text ? <p>{meaning.exampleSentence}</p> : null}
+                  {meaning?.usageContext ? <p>{meaning.usageContext}</p> : null}
+                </article>
+              );
+            })}
+          </section>
         ) : (
           <article className="study-card">
             <h2>暂无词条</h2>
@@ -39,4 +95,10 @@ export default async function LearnPage() {
       </nav>
     </main>
   );
+}
+
+function formatStudyType(termType: string, partOfSpeech?: string | null) {
+  if (termType === "phrase") return "固定搭配";
+  if (termType === "sentence") return "句型";
+  return `${partOfSpeech ?? "word"} · 🔊`;
 }

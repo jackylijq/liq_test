@@ -125,9 +125,38 @@ select {
   padding: 20px;
 }
 
+.student-grade-links {
+  display: grid;
+  gap: 8px;
+}
+
+.student-grade-links a {
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.student-grade-links a.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
 .student-content {
   min-width: 0;
   padding: 20px;
+}
+
+.student-outline-panel,
+.study-list {
+  display: grid;
+  gap: 10px;
+}
+
+.student-section-title {
+  margin: 14px 0 0;
 }
 
 .study-card {
@@ -309,7 +338,8 @@ select {
     align-content: center;
   }
 
-  .exam-scroll .student-content {
+  .exam-scroll .student-content,
+  .learn-scroll .student-content {
     overflow: auto;
     align-content: start;
   }

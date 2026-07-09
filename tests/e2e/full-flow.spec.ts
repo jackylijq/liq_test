@@ -13,5 +13,5 @@ test("teacher import creates content students can review", async ({ page }) => {
 
   await page.goto("/learn");
   await expect(page.getByRole("heading", { name: "学习" })).toBeVisible();
-  await expect(page.locator(".study-card")).toBeVisible();
+  await expect(page.locator(".study-card").first()).toBeVisible();
 });
