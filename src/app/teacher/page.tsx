@@ -81,7 +81,7 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
             <nav className="teacher-unit-tabs" aria-label="单元筛选">
               {outline.map((unit) => (
                 <Link
-                  className={unit.id === selectedUnit?.id && !selectedCategory ? "active" : ""}
+                  className={unit.id === selectedUnit?.id ? "active" : ""}
                   href={`/teacher?groupId=${selectedGroup.id}&unitId=${unit.id}`}
                   key={unit.id}
                 >

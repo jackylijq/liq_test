@@ -89,6 +89,8 @@ test("teacher markdown import renders units and section filters in the main pane
 
   await page.getByRole("link", { name: "Section A-重点词汇", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Section A-重点词汇" })).toBeVisible();
+  await expect(page.getByLabel("单元筛选").getByRole("link", { name: unitName, exact: true })).toHaveClass(/active/);
+  await expect(page.getByRole("link", { name: "Section A-重点词汇", exact: true })).toHaveClass(/active/);
   await expect(page.getByText("fox", { exact: true })).toBeVisible();
   await expect(page.getByText("take care of", { exact: true })).toHaveCount(0);
   await expect(page.getByText("I like the way they walk.", { exact: true })).toHaveCount(0);
