@@ -47,6 +47,31 @@ test("teacher can import into a selected category and view split content", async
   await expect(page.getByText("常用场景")).toBeVisible();
 });
 
+test("teacher markdown import creates unit and section category filters", async ({ page }) => {
+  const suffix = Date.now();
+  const unitName = `Unit ${suffix} Category`;
+  const leafName = `${unitName} / Section A 基础过关 - 重点词汇`;
+  const term = `codexcategory${suffix}`;
+
+  await page.goto("/teacher");
+  await page.getByLabel("粘贴 MD/TXT 导入内容").fill(`# Test Book
+
+## ${unitName}
+
+### Section A 基础过关
+
+#### 重点词汇
+- ${term} n. 分类词
+`);
+  await page.getByRole("button", { name: "解析到当前分类" }).click();
+  await page.getByRole("button", { name: "确认导入" }).click();
+
+  await expect(page.getByRole("link", { name: unitName, exact: true })).toBeVisible();
+  await page.getByRole("link", { name: leafName, exact: true }).click();
+  await expect(page.getByRole("heading", { name: leafName })).toBeVisible();
+  await expect(page.getByText(term, { exact: true })).toBeVisible();
+});
+
 test("preview rows do not emit duplicate key warnings", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {

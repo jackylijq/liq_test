@@ -4,6 +4,8 @@ import { defaultGradeGroupNames } from "./default-groups";
 export type TeacherGroupOption = {
   id: string;
   name: string;
+  rawName: string;
+  parentId: string | null;
   sortOrder: number;
 };
 
@@ -49,10 +51,11 @@ export function summarizeTeacherTerms(terms: TeacherTermForSummary[]) {
 
 export async function getTeacherGroups(): Promise<TeacherGroupOption[]> {
   await ensureDefaultTeacherGroups();
-  return prisma.group.findMany({
+  const groups = await prisma.group.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, sortOrder: true },
+    select: { id: true, name: true, parentId: true, sortOrder: true },
   });
+  return flattenTeacherGroups(groups);
 }
 
 export async function getTeacherGroupTerms(groupId: string) {
@@ -82,4 +85,36 @@ async function ensureDefaultTeacherGroups() {
       });
     }
   }
+}
+
+function flattenTeacherGroups(
+  groups: Array<{ id: string; name: string; parentId: string | null; sortOrder: number }>,
+): TeacherGroupOption[] {
+  const childrenByParent = new Map<string | null, typeof groups>();
+  for (const group of groups) {
+    const children = childrenByParent.get(group.parentId) ?? [];
+    children.push(group);
+    childrenByParent.set(group.parentId, children);
+  }
+
+  for (const children of childrenByParent.values()) {
+    children.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  }
+
+  const flattened: TeacherGroupOption[] = [];
+
+  function visit(parentId: string | null, parentPath: string[]) {
+    for (const group of childrenByParent.get(parentId) ?? []) {
+      const path = parentId ? [...parentPath, group.name] : [];
+      flattened.push({
+        ...group,
+        rawName: group.name,
+        name: path.length ? path.join(" / ") : group.name,
+      });
+      visit(group.id, path);
+    }
+  }
+
+  visit(null, []);
+  return flattened;
 }

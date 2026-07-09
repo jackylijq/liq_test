@@ -22,6 +22,9 @@ type ParseMode = "word" | "phrase" | "sentence" | "ignore";
 type ParseContext = {
   mode?: ParseMode;
   partOfSpeech?: string;
+  unitHeading?: string;
+  sectionHeading?: string;
+  bucketHeading?: string;
 };
 
 function detectTermType(text: string, explicitPartOfSpeech?: string, forcedMode?: ParseMode): TermType {
@@ -514,6 +517,30 @@ function classifyHeading(line: string): ParseMode | undefined {
   return undefined;
 }
 
+function parseMarkdownHeading(line: string) {
+  const match = line.match(/^(#{1,6})\s*(.+)$/);
+  if (!match) return undefined;
+  return {
+    level: match[1].length,
+    text: match[2].trim(),
+  };
+}
+
+function categoryPathFromContext(context: ParseContext) {
+  if (!context.unitHeading) return undefined;
+
+  const path = [context.unitHeading];
+  if (context.sectionHeading && context.bucketHeading) {
+    path.push(`${context.sectionHeading} - ${context.bucketHeading}`);
+  } else if (context.sectionHeading) {
+    path.push(context.sectionHeading);
+  } else if (context.bucketHeading) {
+    path.push(context.bucketHeading);
+  }
+
+  return path;
+}
+
 function classifyPlainLine(line: string): ParseMode | "skip" | undefined {
   const heading = line.replace(/^-/, "").replace(/^[一二三四五六七八九十]+[、.．]\s*/, "").trim();
   if (/校本教材/.test(heading)) return "skip";
@@ -552,6 +579,20 @@ export function parseImportedText(text: string): TermDraft[] {
     if (/^-{3,}$/.test(line)) continue;
 
     if (/^#{1,6}\s/.test(line)) {
+      const heading = parseMarkdownHeading(line);
+      if (heading) {
+        if (heading.level === 2) {
+          context.unitHeading = heading.text;
+          context.sectionHeading = undefined;
+          context.bucketHeading = undefined;
+        } else if (heading.level === 3) {
+          context.sectionHeading = heading.text;
+          context.bucketHeading = undefined;
+        } else if (heading.level >= 4) {
+          context.bucketHeading = heading.text;
+        }
+      }
+
       context.mode = classifyHeading(line);
       context.partOfSpeech = undefined;
       continue;
@@ -574,7 +615,12 @@ export function parseImportedText(text: string): TermDraft[] {
     if (context.mode === "sentence" || context.mode === "ignore") continue;
 
     const row = parseLine(line, context);
-    if (row?.text) rows.push(row);
+    if (row?.text) {
+      rows.push({
+        ...row,
+        categoryPath: row.categoryPath ?? categoryPathFromContext(context),
+      });
+    }
   }
 
   return dedupeRows(rows);

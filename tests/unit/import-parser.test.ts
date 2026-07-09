@@ -69,6 +69,32 @@ describe("parseImportedText", () => {
     expect(rows.some((row) => row.text.includes("Why do you like penguins"))).toBe(false);
   });
 
+  it("keeps textbook markdown unit and section category paths on imported terms", () => {
+    const rows = parseImportedText(`# 武汉市光谷实验中学七年级英语校本教材
+
+## Unit 1 Animal Friends
+
+### Section A 基础过关
+
+#### 重点词汇
+- fox n.
+
+#### 必会词块
+- take care of
+
+### Section B 基础过关
+
+#### 重点单词
+- save
+`);
+
+    expect(rows.map((row) => ({ text: row.text, categoryPath: row.categoryPath }))).toEqual([
+      { text: "fox", categoryPath: ["Unit 1 Animal Friends", "Section A 基础过关 - 重点词汇"] },
+      { text: "take care of", categoryPath: ["Unit 1 Animal Friends", "Section A 基础过关 - 必会词块"] },
+      { text: "save", categoryPath: ["Unit 1 Animal Friends", "Section B 基础过关 - 重点单词"] },
+    ]);
+  });
+
   it("parses compact PDF textbook extraction without importing headings or sentence rows", () => {
     const rows = parseImportedText(`武汉市光谷实验中学七年级英语校本教材
 Unit1AnimalFriends

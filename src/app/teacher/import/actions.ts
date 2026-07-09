@@ -145,19 +145,21 @@ export async function confirmImportAction(formData: FormData) {
       include: { meanings: true },
     });
 
-    await prisma.termGroup.upsert({
-      where: {
-        termId_groupId: {
-          termId: term.id,
-          groupId: batch.targetGroupId,
+    for (const groupId of await resolveDraftGroupIds(batch.targetGroupId, draft)) {
+      await prisma.termGroup.upsert({
+        where: {
+          termId_groupId: {
+            termId: term.id,
+            groupId,
+          },
         },
-      },
-      update: {},
-      create: {
-        termId: term.id,
-        groupId: batch.targetGroupId,
-      },
-    });
+        update: {},
+        create: {
+          termId: term.id,
+          groupId,
+        },
+      });
+    }
 
     await saveDraftMeanings(term.id, draft, term.meanings);
   }
@@ -232,4 +234,33 @@ function hasMeaningContent(meaning: MeaningDraft) {
       meaning.explanation?.trim() ||
       meaning.usageContext?.trim(),
   );
+}
+
+async function resolveDraftGroupIds(targetGroupId: string, draft: TermDraft) {
+  const groupIds = [targetGroupId];
+  let parentId = targetGroupId;
+
+  for (const [index, rawName] of (draft.categoryPath ?? []).entries()) {
+    const name = rawName.trim();
+    if (!name) continue;
+
+    const group = await findOrCreateChildGroup(name, parentId, index + 1);
+    groupIds.push(group.id);
+    parentId = group.id;
+  }
+
+  return [...new Set(groupIds)];
+}
+
+async function findOrCreateChildGroup(name: string, parentId: string, sortOrder: number) {
+  const existing = await prisma.group.findFirst({ where: { name, parentId } });
+  if (existing) return existing;
+
+  return prisma.group.create({
+    data: {
+      name,
+      parentId,
+      sortOrder,
+    },
+  });
 }
