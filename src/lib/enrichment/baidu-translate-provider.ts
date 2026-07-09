@@ -4,6 +4,7 @@ type FetchLike = typeof fetch;
 
 type BaiduTranslateOptions = {
   endpoint?: string;
+  textEndpoint?: string;
   fetchImpl?: FetchLike;
 };
 
@@ -15,7 +16,7 @@ type BaiduPart = {
 type BaiduResponse = {
   errno?: number;
   data?: { k?: string; v?: string }[];
-  trans_result?: { dst?: string }[];
+  trans_result?: { dst?: string }[] | { data?: { src?: string; dst?: string }[] };
   dict_result?: {
     simple_means?: {
       symbols?: {
@@ -31,6 +32,7 @@ type BaiduResponse = {
 };
 
 const defaultEndpoint = "https://fanyi.baidu.com/sug";
+const defaultTextEndpoint = "https://fanyi.baidu.com/transapi";
 
 const partOfSpeechMap: Record<string, string> = {
   n: "noun",
@@ -65,8 +67,13 @@ function wrapPhonetic(value: string | undefined) {
   return `/${trimmed}/`;
 }
 
+function getTextTranslationItems(response: BaiduResponse) {
+  if (Array.isArray(response.trans_result)) return response.trans_result;
+  return response.trans_result?.data ?? [];
+}
+
 function firstTranslation(response: BaiduResponse) {
-  return response.trans_result?.map((item) => item.dst?.trim()).find(Boolean) ?? response.data?.map((item) => item.v?.trim()).find(Boolean);
+  return getTextTranslationItems(response).map((item) => item.dst?.trim()).find(Boolean) ?? response.data?.map((item) => item.v?.trim()).find(Boolean);
 }
 
 function normalizeExamplePair(pair: unknown) {
@@ -247,10 +254,8 @@ export function parseBaiduTranslateResponse(response: unknown, draft: TermDraft)
   };
 }
 
-export async function baiduTranslateEnrichTerm(draft: TermDraft, options: BaiduTranslateOptions = {}): Promise<TermDraft> {
-  const endpoint = options.endpoint ?? process.env.BAIDU_TRANSLATE_WEB_ENDPOINT ?? defaultEndpoint;
-  const body = new URLSearchParams({ kw: draft.text });
-  const response = await (options.fetchImpl ?? fetch)(endpoint, {
+async function postBaiduForm(endpoint: string, body: URLSearchParams, fetchImpl: FetchLike) {
+  const response = await fetchImpl(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -262,6 +267,46 @@ export async function baiduTranslateEnrichTerm(draft: TermDraft, options: BaiduT
   if (!response.ok) {
     throw new Error(`Baidu web translate failed with status ${response.status}`);
   }
+  return response.json();
+}
 
-  return parseBaiduTranslateResponse(await response.json(), draft);
+function hasWebLookupMeaning(draft: TermDraft) {
+  return draft.meanings.some((meaning) => meaning.chineseMeaning.trim() && meaning.fieldSources.chineseMeaning === "web_lookup");
+}
+
+export async function baiduTranslateEnrichTerm(draft: TermDraft, options: BaiduTranslateOptions = {}): Promise<TermDraft> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const endpoint = options.endpoint ?? process.env.BAIDU_TRANSLATE_WEB_ENDPOINT ?? defaultEndpoint;
+  let firstError: unknown;
+  let suggestionDraft: TermDraft | undefined;
+
+  try {
+    suggestionDraft = parseBaiduTranslateResponse(await postBaiduForm(endpoint, new URLSearchParams({ kw: draft.text }), fetchImpl), draft);
+    if (hasWebLookupMeaning(suggestionDraft)) return suggestionDraft;
+  } catch (error) {
+    firstError = error;
+  }
+
+  const textEndpoint = options.textEndpoint ?? process.env.BAIDU_TRANSLATE_TEXT_ENDPOINT ?? defaultTextEndpoint;
+  try {
+    const textDraft = parseBaiduTranslateResponse(
+      await postBaiduForm(
+        textEndpoint,
+        new URLSearchParams({
+          from: "en",
+          to: "zh",
+          query: draft.text,
+          source: "txt",
+        }),
+        fetchImpl,
+      ),
+      draft,
+    );
+    if (hasWebLookupMeaning(textDraft)) return textDraft;
+  } catch (error) {
+    if (!suggestionDraft && firstError) throw firstError;
+    if (!suggestionDraft) throw error;
+  }
+
+  return suggestionDraft ?? draft;
 }

@@ -79,6 +79,20 @@ describe("parseBaiduTranslateResponse", () => {
       },
     ]);
   });
+
+  it("parses Baidu text translation data for phrases", () => {
+    const parsed = parseBaiduTranslateResponse(
+      { trans_result: { data: [{ src: "Across the country", dst: "全国各地" }] } },
+      { text: "Across the country", termType: "phrase", meanings: [] },
+    );
+
+    expect(parsed.meanings).toEqual([
+      {
+        chineseMeaning: "全国各地",
+        fieldSources: { chineseMeaning: "web_lookup" },
+      },
+    ]);
+  });
 });
 
 describe("baiduTranslateEnrichTerm", () => {
@@ -104,5 +118,37 @@ describe("baiduTranslateEnrichTerm", () => {
     expect(calls[0][1].method).toBe("POST");
     expect(String(calls[0][1].body)).toContain("kw=care");
     expect(enriched.meanings[0].chineseMeaning).toBe("照顾");
+  });
+
+  it("falls back to Baidu text translation when suggestion data is empty", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ errno: 0, data: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ trans_result: { data: [{ dst: "全国各地" }] } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+    const enriched = await baiduTranslateEnrichTerm(
+      { text: "Across the country", termType: "phrase", meanings: [] },
+      {
+        endpoint: "https://example.test/sug",
+        textEndpoint: "https://example.test/transapi",
+        fetchImpl: fetchMock,
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const calls = fetchMock.mock.calls as unknown as [[string, RequestInit], [string, RequestInit]];
+    expect(calls[1][0]).toBe("https://example.test/transapi");
+    expect(String(calls[1][1].body)).toContain("query=Across+the+country");
+    expect(enriched.meanings[0].chineseMeaning).toBe("全国各地");
   });
 });
