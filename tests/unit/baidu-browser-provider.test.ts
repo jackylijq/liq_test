@@ -56,6 +56,22 @@ describe("parseBaiduBrowserTranslateResponse", () => {
     expect(parsed.meanings[0].explanation).toContain("couldn't care less");
   });
 
+  it("replaces placeholder phonetic symbols with browser phonetics", () => {
+    const parsed = parseBaiduBrowserTranslateResponse(
+      {
+        status: 0,
+        result: JSON.stringify({
+          content: [{ mean: [{ pre: "n.", cont: { 关心: 0 } }] }],
+          voice: [{ en_phonic: "[keə(r)]" }, { us_phonic: "[ker]" }],
+          src: "care",
+        }),
+      },
+      { text: "care", termType: "word", phoneticSymbol: "/care/", meanings: [] },
+    );
+
+    expect(parsed.phoneticSymbol).toBe("英/[keə(r)]/ 美/[ker]/");
+  });
+
   it("parses browser v2Fetch phrase meanings", () => {
     const parsed = parseBaiduBrowserTranslateResponse(
       {

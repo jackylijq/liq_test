@@ -71,7 +71,7 @@ async function saveEnrichedTerm(term: DbTerm, draft: TermDraft) {
   await prisma.term.update({
     where: { id: term.id },
     data: {
-      phoneticSymbol: term.phoneticSymbol ?? (draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null),
+      phoneticSymbol: draft.termType === "word" ? choosePhoneticSymbol(term.text, term.phoneticSymbol, draft.phoneticSymbol) : null,
       pronunciationUrl: term.pronunciationUrl ?? (draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null),
     },
   });
@@ -116,6 +116,17 @@ async function saveEnrichedTerm(term: DbTerm, draft: TermDraft) {
   }
 
   await deleteStaleLookupMeanings(term, draft, savedMeaningIds);
+}
+
+function choosePhoneticSymbol(termText: string, existing: string | null, incoming: string | undefined) {
+  if (!existing) return incoming ?? null;
+  if (incoming && isPlaceholderPhonetic(termText, existing)) return incoming;
+  return existing;
+}
+
+function isPlaceholderPhonetic(termText: string, phoneticSymbol: string) {
+  const normalizedPhonetic = phoneticSymbol.replace(/^\/|\/$/g, "").trim().toLowerCase();
+  return normalizedPhonetic === termText.trim().toLowerCase();
 }
 
 function findExistingMeaning(term: DbTerm, meaning: MeaningDraft, excludedIds: string[]) {
