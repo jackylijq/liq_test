@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import type { MeaningDraft, TermDraft, TermType } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
 import { getTeacherGroupScope, getTeacherGroupScopeIds, sortTeacherTermsForEnrichment } from "@/lib/teacher/groups";
+import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 
 type DbTerm = Awaited<ReturnType<typeof getTermsForEnrichment>>[number];
 
@@ -13,19 +14,94 @@ export async function enrichTeacherTermsAction(formData: FormData) {
   const targetGroupId = String(formData.get("targetGroupId") ?? "");
   const mode = String(formData.get("mode") ?? "selected");
   const selectedIds = formData.getAll("termId").map(String).filter(Boolean);
+  logTeacherDebug("enrich", "action:start", {
+    targetGroupId,
+    mode,
+    selectedIds,
+  });
 
   if (!targetGroupId) redirect("/teacher");
   if (mode !== "all" && selectedIds.length === 0) redirect(`/teacher/enrich?groupId=${targetGroupId}&error=empty-selection`);
 
   const terms = await getTermsForEnrichment(targetGroupId, mode === "all" ? undefined : selectedIds);
+  logTeacherDebug("enrich", "action:terms", {
+    count: terms.length,
+    terms: terms.map(debugDbTerm),
+  });
   for (const term of terms) {
     const draft = dbTermToDraft(term);
+    logTeacherDebug("enrich", "term:before", {
+      term: debugDbTerm(term),
+      draft: debugTermDraft(draft),
+    });
     const enriched = await enrichTermDraft(draft, { useBrowser: true });
+    logTeacherDebug("enrich", "term:after-enrich", {
+      termId: term.id,
+      enriched: debugTermDraft(enriched),
+    });
     await saveEnrichedTerm(term, enriched);
+    const savedTerm = await prisma.term.findUnique({
+      where: { id: term.id },
+      include: { meanings: { orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }] } },
+    });
+    logTeacherDebug("enrich", "term:after-save", {
+      term: savedTerm
+        ? {
+            id: savedTerm.id,
+            text: savedTerm.text,
+            phoneticSymbol: savedTerm.phoneticSymbol,
+            pronunciationUrl: savedTerm.pronunciationUrl,
+            meanings: savedTerm.meanings.map((meaning) => ({
+              partOfSpeech: meaning.partOfSpeech,
+              chineseMeaning: meaning.chineseMeaning,
+              exampleSentence: meaning.exampleSentence,
+              explanation: meaning.explanation,
+              usageContext: meaning.usageContext,
+              fieldSourcesJson: meaning.fieldSourcesJson,
+            })),
+          }
+        : null,
+    });
   }
 
   const scope = await getTeacherGroupScope(targetGroupId);
   redirect(scope?.teacherHref ?? `/teacher?groupId=${targetGroupId}`);
+}
+
+function debugDbTerm(term: DbTerm) {
+  return {
+    id: term.id,
+    text: term.text,
+    termType: term.termType,
+    phoneticSymbol: term.phoneticSymbol,
+    pronunciationUrl: term.pronunciationUrl,
+    meanings: term.meanings.map((meaning) => ({
+      id: meaning.id,
+      partOfSpeech: meaning.partOfSpeech,
+      chineseMeaning: meaning.chineseMeaning,
+      exampleSentence: meaning.exampleSentence,
+      explanation: meaning.explanation,
+      usageContext: meaning.usageContext,
+      fieldSourcesJson: meaning.fieldSourcesJson,
+    })),
+  };
+}
+
+function debugTermDraft(row: TermDraft) {
+  return {
+    text: row.text,
+    termType: row.termType,
+    phoneticSymbol: row.phoneticSymbol,
+    pronunciationUrl: row.pronunciationUrl,
+    meanings: row.meanings.map((meaning) => ({
+      partOfSpeech: meaning.partOfSpeech,
+      chineseMeaning: meaning.chineseMeaning,
+      exampleSentence: meaning.exampleSentence,
+      explanation: meaning.explanation,
+      usageContext: meaning.usageContext,
+      fieldSources: meaning.fieldSources,
+    })),
+  };
 }
 
 async function getTermsForEnrichment(groupId: string, selectedIds?: string[]) {

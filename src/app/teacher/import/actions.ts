@@ -7,6 +7,7 @@ import { buildSupplementDrafts, getTeacherImportMode, shouldUseBrowserForSourceI
 import { parseImportedText } from "@/lib/import/parse-text";
 import { extractPdfText } from "@/lib/import/parse-pdf";
 import { prisma } from "@/lib/db";
+import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
 
@@ -14,8 +15,19 @@ export async function parseImportAction(formData: FormData) {
   const content = String(formData.get("content") ?? "");
   const targetGroupId = String(formData.get("targetGroupId") ?? "");
   const targetGroup = await resolveTargetGroup(targetGroupId);
+  logTeacherDebug("import", "parse:start", {
+    targetGroupId: targetGroup.id,
+    pastedContent: content,
+    pastedContentLength: content.length,
+    file: getImportFileDebug(formData),
+  });
   const parsedImport = await parseImportFormData(formData, content, targetGroup.id);
   const parsed = parsedImport.rows;
+  logTeacherDebug("import", "parse:rows", {
+    mode: parsedImport.mode,
+    rowCount: parsed.length,
+    rows: parsed.map(debugTermDraft),
+  });
 
   if (parsed.length === 0) {
     redirect(`/teacher?groupId=${targetGroup.id}&error=empty-import`);
@@ -23,7 +35,21 @@ export async function parseImportAction(formData: FormData) {
 
   const enriched =
     parsedImport.mode === "source"
-      ? await Promise.all(parsed.map((row) => enrichTermDraft(row, { useBrowser: shouldUseBrowserForSourceImport(row, { rowCount: parsed.length }) })))
+      ? await Promise.all(
+          parsed.map(async (row) => {
+            const useBrowser = shouldUseBrowserForSourceImport(row, { rowCount: parsed.length });
+            logTeacherDebug("import", "enrich:before", {
+              useBrowser,
+              row: debugTermDraft(row),
+            });
+            const enrichedRow = await enrichTermDraft(row, { useBrowser });
+            logTeacherDebug("import", "enrich:after", {
+              useBrowser,
+              row: debugTermDraft(enrichedRow),
+            });
+            return enrichedRow;
+          }),
+        )
       : parsed;
   const batch = await prisma.importBatch.create({
     data: {
@@ -43,12 +69,27 @@ export async function parseImportAction(formData: FormData) {
       },
     },
   });
+  logTeacherDebug("import", "parse:preview-created", {
+    batchId: batch.id,
+    mode: parsedImport.mode,
+    enrichedRows: enriched.map(debugTermDraft),
+  });
   redirect(`/teacher/import/${batch.id}/preview`);
 }
 
 function getImportFileName(formData: FormData) {
   const file = formData.get("file");
   return file instanceof File && file.size > 0 ? file.name : null;
+}
+
+function getImportFileDebug(formData: FormData) {
+  const file = formData.get("file");
+  if (!(file instanceof File)) return null;
+  return {
+    name: file.name,
+    size: file.size,
+    type: file.type,
+  };
 }
 
 async function resolveTargetGroup(groupId: string) {
@@ -126,6 +167,11 @@ export async function confirmImportAction(formData: FormData) {
 
   for (const row of batch.rows) {
     const draft = JSON.parse(row.enrichedJson) as TermDraft;
+    logTeacherDebug("import", "confirm:row", {
+      batchId: batch.id,
+      sourceType: batch.sourceType,
+      draft: debugTermDraft(draft),
+    });
     if (batch.sourceType === "supplement") {
       await applySupplementDraft(draft);
       continue;
@@ -167,6 +213,28 @@ export async function confirmImportAction(formData: FormData) {
     }
 
     await saveDraftMeanings(term.id, draft, term.meanings);
+    const savedTerm = await prisma.term.findUnique({
+      where: { id: term.id },
+      include: { meanings: { orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }] } },
+    });
+    logTeacherDebug("import", "confirm:saved-term", {
+      term: savedTerm
+        ? {
+            id: savedTerm.id,
+            text: savedTerm.text,
+            phoneticSymbol: savedTerm.phoneticSymbol,
+            pronunciationUrl: savedTerm.pronunciationUrl,
+            meanings: savedTerm.meanings.map((meaning) => ({
+              partOfSpeech: meaning.partOfSpeech,
+              chineseMeaning: meaning.chineseMeaning,
+              exampleSentence: meaning.exampleSentence,
+              explanation: meaning.explanation,
+              usageContext: meaning.usageContext,
+              fieldSourcesJson: meaning.fieldSourcesJson,
+            })),
+          }
+        : null,
+    });
   }
 
   await prisma.importBatch.update({
@@ -174,6 +242,24 @@ export async function confirmImportAction(formData: FormData) {
     data: { status: "confirmed", confirmedAt: new Date() },
   });
   redirect(`/teacher?groupId=${batch.targetGroupId}`);
+}
+
+function debugTermDraft(row: TermDraft) {
+  return {
+    text: row.text,
+    termType: row.termType,
+    phoneticSymbol: row.phoneticSymbol,
+    pronunciationUrl: row.pronunciationUrl,
+    categoryPath: row.categoryPath,
+    meanings: row.meanings.map((meaning) => ({
+      partOfSpeech: meaning.partOfSpeech,
+      chineseMeaning: meaning.chineseMeaning,
+      exampleSentence: meaning.exampleSentence,
+      explanation: meaning.explanation,
+      usageContext: meaning.usageContext,
+      fieldSources: meaning.fieldSources,
+    })),
+  };
 }
 
 async function applySupplementDraft(draft: TermDraft) {
