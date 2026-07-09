@@ -54,9 +54,9 @@ export function buildSupplementDrafts(parsedRows: TermDraft[], existingTerms: Ex
       text: matched.text,
       normalizedText: normalizeTermText(matched.text),
       termType,
-      phoneticSymbol: termType === "phrase" ? undefined : row.phoneticSymbol,
+      phoneticSymbol: termType === "word" ? row.phoneticSymbol : undefined,
       meanings:
-        termType === "phrase"
+        termType === "phrase" || termType === "sentence"
           ? row.meanings.map(({ partOfSpeech: _partOfSpeech, ...meaning }) => meaning)
           : row.meanings,
     });

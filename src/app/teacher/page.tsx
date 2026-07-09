@@ -7,6 +7,7 @@ import {
   selectTeacherGroup,
   summarizeTeacherTerms,
 } from "@/lib/teacher/groups";
+import { getMeaningLines, shouldShowUsageContext } from "@/lib/terms/display";
 
 type TeacherPageProps = {
   searchParams: Promise<{ groupId?: string; unitId?: string; categoryId?: string; error?: string }>;
@@ -117,16 +118,18 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
                   {term.termType === "phrase" ? <span>短语</span> : null}
                   {term.termType === "sentence" ? <span>句子</span> : null}
                 </div>
+                {getMeaningLines(term.termType, term.meanings).map((line, index) => (
+                  <p key={`${term.id}-meaning-${index}`}>{line}</p>
+                ))}
                 {term.termType === "word" && term.meanings[0]?.exampleSentence ? (
                   <p>{term.meanings[0].exampleSentence}</p>
-                ) : null}
-                {term.termType === "phrase" && term.meanings[0]?.usageContext ? (
-                  <p>{term.meanings[0].usageContext}</p>
                 ) : null}
                 {term.termType === "sentence" && term.meanings[0]?.exampleSentence ? (
                   <p>{term.meanings[0].exampleSentence}</p>
                 ) : null}
-                <p>{term.meanings.map((meaning) => meaning.chineseMeaning).filter(Boolean).join("；")}</p>
+                {term.meanings.map((meaning, index) =>
+                  shouldShowUsageContext(meaning) ? <p key={`${term.id}-usage-${index}`}>{meaning.usageContext}</p> : null,
+                )}
               </article>
             ))
           )}

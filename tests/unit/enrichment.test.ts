@@ -25,7 +25,7 @@ describe("mockEnrichTerm", () => {
     expect(enriched.meanings[0].fieldSources.chineseMeaning).toBe("mock_generated");
   });
 
-  it("fills phrase usage context without phonetic symbol or part of speech", async () => {
+  it("does not invent phrase usage context when it is missing", async () => {
     const draft: TermDraft = {
       text: "look after",
       termType: "phrase",
@@ -35,7 +35,7 @@ describe("mockEnrichTerm", () => {
     expect(enriched.phoneticSymbol).toBeUndefined();
     expect(enriched.meanings[0].partOfSpeech).toBeUndefined();
     expect(enriched.meanings[0].chineseMeaning).toBe("照顾");
-    expect(enriched.meanings[0].usageContext).toContain("常用场景");
+    expect(enriched.meanings[0].usageContext).toBeUndefined();
   });
 });
 

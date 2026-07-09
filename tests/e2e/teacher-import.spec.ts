@@ -32,6 +32,18 @@ test("teacher can import an uploaded file and see preview", async ({ page }) => 
   await expect(page.getByText("香蕉")).toBeVisible();
 });
 
+test("teacher shows phrase meaning directly below English without usage context", async ({ page }) => {
+  await page.goto("/teacher");
+  await page.getByLabel("粘贴 MD/TXT 导入内容").fill("be good for 对有好处");
+  await page.getByRole("button", { name: "解析到当前分类" }).click();
+  await page.getByRole("button", { name: "确认导入" }).click();
+
+  const card = page.locator(".teacher-term-card").filter({ hasText: "be good for" });
+  await expect(card.locator("strong", { hasText: "be good for" })).toBeVisible();
+  await expect(card.getByText("对有好处", { exact: true })).toBeVisible();
+  await expect(card.getByText("常用场景")).toHaveCount(0);
+});
+
 test("teacher can import into a selected category and view split content", async ({ page }) => {
   await page.goto("/teacher");
   await page.getByRole("link", { name: "2年级上册" }).click();
@@ -43,7 +55,7 @@ test("teacher can import into a selected category and view split content", async
 
   await expect(page.getByRole("heading", { name: "2年级上册" })).toBeVisible();
   await expect(page.getByText("look after", { exact: true })).toBeVisible();
-  await expect(page.getByText("常用场景")).toBeVisible();
+  await expect(page.getByText("常用场景")).toHaveCount(0);
 });
 
 test("teacher markdown import renders units and section filters in the main pane", async ({ page }) => {

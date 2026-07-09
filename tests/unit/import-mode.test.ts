@@ -53,4 +53,28 @@ describe("buildSupplementDrafts", () => {
       { text: "quite", type: "word", meaning: "相当；非常" },
     ]);
   });
+
+  it("matches sentence supplements and keeps them free of word-only fields", () => {
+    const matched = buildSupplementDrafts(
+      [
+        {
+          text: "I like the way they walk.",
+          termType: "phrase",
+          phoneticSymbol: "/bad/",
+          meanings: [{ chineseMeaning: "我喜欢它们走路的方式", partOfSpeech: "noun", fieldSources: { chineseMeaning: "parsed" } }],
+        },
+      ],
+      [{ text: "I like the way they walk.", normalizedText: "i like the way they walk.", termType: "sentence" }],
+    );
+
+    expect(matched).toEqual([
+      {
+        text: "I like the way they walk.",
+        normalizedText: "i like the way they walk.",
+        termType: "sentence",
+        phoneticSymbol: undefined,
+        meanings: [{ chineseMeaning: "我喜欢它们走路的方式", fieldSources: { chineseMeaning: "parsed" } }],
+      },
+    ]);
+  });
 });

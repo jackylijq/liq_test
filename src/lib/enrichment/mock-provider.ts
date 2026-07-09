@@ -35,25 +35,21 @@ export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
             chineseMeaning: meaning.chineseMeaning.trim() || `${draft.text} 的中文意思`,
             exampleSentence: meaning.exampleSentence ?? `Please use "${draft.text}" in a simple sentence.`,
             partOfSpeech: undefined,
-            usageContext: meaning.usageContext ?? `常用场景：${draft.text} 常用于日常交流和课文表达中。`,
             fieldSources: {
               ...meaning.fieldSources,
               chineseMeaning: meaning.chineseMeaning.trim()
                 ? meaning.fieldSources.chineseMeaning
                 : "mock_generated",
               exampleSentence: meaning.fieldSources.exampleSentence ?? "mock_generated",
-              usageContext: meaning.fieldSources.usageContext ?? "mock_generated",
             },
           }))
         : [
             {
               chineseMeaning: `${draft.text} 的中文意思`,
               exampleSentence: `Please use "${draft.text}" in a simple sentence.`,
-              usageContext: `常用场景：${draft.text} 常用于日常交流和课文表达中。`,
               fieldSources: {
                 chineseMeaning: "mock_generated",
                 exampleSentence: "mock_generated",
-                usageContext: "mock_generated",
               },
             },
           ],
