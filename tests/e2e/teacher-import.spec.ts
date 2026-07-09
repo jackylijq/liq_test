@@ -10,7 +10,18 @@ test("teacher entry shows default category outline", async ({ page }) => {
   await expect(page.getByRole("link", { name: "6年级下册" })).toBeVisible();
   await expect(page.getByRole("link", { name: "9年级下册" })).toBeVisible();
   await expect(page.getByRole("link", { name: "新增内容" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "补齐" })).toBeVisible();
   await expect(page.getByRole("button", { name: "解析到当前分类" })).toHaveCount(0);
+});
+
+test("teacher can open enrichment page from selected category", async ({ page }) => {
+  await page.goto("/teacher");
+  await page.getByRole("link", { name: "7年级下册" }).click();
+  await expect(page.getByRole("heading", { name: "7年级下册" })).toBeVisible();
+  await page.getByRole("link", { name: "补齐" }).click();
+  await expect(page.getByRole("heading", { name: "7年级下册" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "补齐全部" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "确认补齐选中" })).toBeVisible();
 });
 
 test("teacher can import pasted text and see preview", async ({ page }) => {

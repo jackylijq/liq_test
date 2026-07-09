@@ -4,12 +4,10 @@ import { mockEnrichTerm } from "./mock-provider";
 import { openAiEnrichTerm } from "./openai-provider";
 
 export async function enrichTermDraft(draft: TermDraft): Promise<TermDraft> {
-  if (process.env.BAIDU_TRANSLATE_APP_ID && process.env.BAIDU_TRANSLATE_SECRET_KEY) {
-    try {
-      return await mockEnrichTerm(await baiduTranslateEnrichTerm(draft));
-    } catch {
-      return mockEnrichTerm(draft);
-    }
+  try {
+    return await mockEnrichTerm(await baiduTranslateEnrichTerm(draft));
+  } catch {
+    // The web endpoint is best-effort and can change or throttle; keep imports usable.
   }
 
   if (!process.env.OPENAI_API_KEY) {

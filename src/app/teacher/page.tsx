@@ -50,9 +50,14 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
           </div>
           <div className="teacher-header-actions">
             {selectedGroup ? (
-              <Link className="primary-link" href={`/teacher/import?groupId=${selectedGroup.id}`}>
-                新增内容
-              </Link>
+              <>
+                <Link className="primary-link" href={`/teacher/import?groupId=${selectedGroup.id}`}>
+                  新增内容
+                </Link>
+                <Link className="secondary-link" href={`/teacher/enrich?groupId=${selectedGroup.id}`}>
+                  补齐
+                </Link>
+              </>
             ) : null}
             <div className="teacher-stats">
               <span>单词 {summary.wordCount}</span>

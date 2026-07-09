@@ -1,11 +1,8 @@
-import { createHash } from "node:crypto";
 import type { MeaningDraft, TermDraft, TermType } from "@/lib/types";
 
 type FetchLike = typeof fetch;
 
 type BaiduTranslateOptions = {
-  appId?: string;
-  secretKey?: string;
   endpoint?: string;
   fetchImpl?: FetchLike;
 };
@@ -16,6 +13,8 @@ type BaiduPart = {
 };
 
 type BaiduResponse = {
+  errno?: number;
+  data?: { k?: string; v?: string }[];
   trans_result?: { dst?: string }[];
   dict_result?: {
     simple_means?: {
@@ -31,7 +30,7 @@ type BaiduResponse = {
   };
 };
 
-const defaultEndpoint = "https://fanyi-api.baidu.com/api/trans/vip/translate";
+const defaultEndpoint = "https://fanyi.baidu.com/sug";
 
 const partOfSpeechMap: Record<string, string> = {
   n: "noun",
@@ -67,7 +66,7 @@ function wrapPhonetic(value: string | undefined) {
 }
 
 function firstTranslation(response: BaiduResponse) {
-  return response.trans_result?.map((item) => item.dst?.trim()).find(Boolean);
+  return response.trans_result?.map((item) => item.dst?.trim()).find(Boolean) ?? response.data?.map((item) => item.v?.trim()).find(Boolean);
 }
 
 function normalizeExamplePair(pair: unknown) {
@@ -135,7 +134,7 @@ function mergeParsedMeanings(draft: TermDraft, generated: MeaningDraft[]) {
   });
 }
 
-function parseDictionaryMeanings(response: BaiduResponse, termType: TermType) {
+function parseDictionaryMeanings(response: BaiduResponse, termType: TermType): MeaningDraft[] {
   if (termType !== "word") return [];
 
   const parts = response.dict_result?.simple_means?.symbols?.flatMap((symbol) => symbol.parts ?? []) ?? [];
@@ -162,6 +161,44 @@ function parseDictionaryMeanings(response: BaiduResponse, termType: TermType) {
     .filter((item): item is MeaningDraft => Boolean(item));
 }
 
+function parseSuggestionMeanings(response: BaiduResponse, draft: TermDraft): MeaningDraft[] {
+  if (draft.termType !== "word") return [];
+
+  const raw = response.data?.find((item) => item.k?.trim().toLowerCase() === draft.text.trim().toLowerCase())?.v?.trim() ?? response.data?.[0]?.v?.trim();
+  if (!raw) return [];
+
+  const markerPattern = /(modal|interj|conj|prep|pron|adj|adv|n|v)\./gi;
+  const markers = [...raw.matchAll(markerPattern)];
+  if (!markers.length) {
+    return [
+      {
+        chineseMeaning: raw,
+        fieldSources: { chineseMeaning: "web_lookup" },
+      },
+    ];
+  }
+
+  const meanings: MeaningDraft[] = markers
+    .map((marker, index): MeaningDraft | undefined => {
+      const start = (marker.index ?? 0) + marker[0].length;
+      const end = markers[index + 1]?.index ?? raw.length;
+      const chineseMeaning = raw.slice(start, end).replace(/[;；\s]+$/g, "").trim();
+      if (!chineseMeaning) return undefined;
+
+      const partOfSpeech = normalizePartOfSpeech(marker[1]);
+      return {
+        partOfSpeech,
+        chineseMeaning,
+        fieldSources: {
+          partOfSpeech: partOfSpeech ? "web_lookup" : undefined,
+          chineseMeaning: "web_lookup",
+        },
+      };
+    })
+    .filter((item): item is MeaningDraft => Boolean(item));
+  return meanings;
+}
+
 export function buildBaiduTtsUrl(text: string) {
   const encoded = encodeURIComponent(text);
   return `https://fanyi.baidu.com/gettts?lan=en&text=${encoded}&spd=3&source=web`;
@@ -171,12 +208,16 @@ export function parseBaiduTranslateResponse(response: unknown, draft: TermDraft)
   const baiduResponse = response as BaiduResponse;
   const translation = firstTranslation(baiduResponse);
   const dictionaryMeanings = parseDictionaryMeanings(baiduResponse, draft.termType);
+  const suggestionMeanings = parseSuggestionMeanings(baiduResponse, draft);
   const examples = extractExamples(baiduResponse);
-  const generatedMeanings = dictionaryMeanings.length
-    ? dictionaryMeanings
-    : translation
-      ? [meaningFromTranslation(draft, translation)]
-      : [];
+  let generatedMeanings: MeaningDraft[] = [];
+  if (dictionaryMeanings.length) {
+    generatedMeanings = dictionaryMeanings;
+  } else if (suggestionMeanings.length) {
+    generatedMeanings = suggestionMeanings;
+  } else if (translation) {
+    generatedMeanings = [meaningFromTranslation(draft, translation)];
+  }
 
   const meanings = mergeParsedMeanings(draft, generatedMeanings).map((meaning, index) => {
     const example = examples[index] ?? examples[0];
@@ -196,39 +237,30 @@ export function parseBaiduTranslateResponse(response: unknown, draft: TermDraft)
   const symbol = baiduResponse.dict_result?.simple_means?.symbols?.[0];
   const phoneticSymbol = draft.termType === "word" ? (draft.phoneticSymbol ?? wrapPhonetic(symbol?.ph_en ?? symbol?.ph_am)) : undefined;
 
+  const pronunciationUrl = draft.termType === "word" ? (draft.pronunciationUrl ?? buildBaiduTtsUrl(draft.text)) : undefined;
+
   return {
     ...draft,
     phoneticSymbol,
-    pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? buildBaiduTtsUrl(draft.text)) : undefined,
+    pronunciationUrl,
     meanings: meanings.length ? meanings : draft.meanings,
   };
 }
 
-function sign(appId: string, query: string, salt: string, secretKey: string) {
-  return createHash("md5").update(`${appId}${query}${salt}${secretKey}`).digest("hex");
-}
-
 export async function baiduTranslateEnrichTerm(draft: TermDraft, options: BaiduTranslateOptions = {}): Promise<TermDraft> {
-  const appId = options.appId ?? process.env.BAIDU_TRANSLATE_APP_ID;
-  const secretKey = options.secretKey ?? process.env.BAIDU_TRANSLATE_SECRET_KEY;
-  const endpoint = options.endpoint ?? process.env.BAIDU_TRANSLATE_ENDPOINT ?? defaultEndpoint;
-  if (!appId || !secretKey) {
-    throw new Error("BAIDU_TRANSLATE_APP_ID and BAIDU_TRANSLATE_SECRET_KEY are not configured");
-  }
-
-  const salt = Date.now().toString();
-  const params = new URLSearchParams({
-    q: draft.text,
-    from: "en",
-    to: "zh",
-    appid: appId,
-    salt,
-    sign: sign(appId, draft.text, salt, secretKey),
+  const endpoint = options.endpoint ?? process.env.BAIDU_TRANSLATE_WEB_ENDPOINT ?? defaultEndpoint;
+  const body = new URLSearchParams({ kw: draft.text });
+  const response = await (options.fetchImpl ?? fetch)(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Referer: "https://fanyi.baidu.com/",
+      "User-Agent": "Mozilla/5.0",
+    },
+    body,
   });
-
-  const response = await (options.fetchImpl ?? fetch)(`${endpoint}?${params.toString()}`);
   if (!response.ok) {
-    throw new Error(`Baidu translate failed with status ${response.status}`);
+    throw new Error(`Baidu web translate failed with status ${response.status}`);
   }
 
   return parseBaiduTranslateResponse(await response.json(), draft);

@@ -288,6 +288,15 @@ select {
   font-weight: 700;
 }
 
+.secondary-link {
+  border: 1px solid #cfd5df;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2937;
+  padding: 9px 14px;
+  font-weight: 700;
+}
+
 .teacher-stats span,
 .teacher-unit-tabs a,
 .teacher-filter-tabs a {
@@ -338,6 +347,61 @@ select {
   color: #fff;
   padding: 10px 14px;
   font-weight: 700;
+}
+
+.teacher-enrich-panel {
+  gap: 16px;
+}
+
+.enrich-form {
+  display: grid;
+  gap: 14px;
+}
+
+.enrich-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.enrich-actions button {
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.enrich-actions button[value="all"] {
+  background: #111827;
+}
+
+.enrich-list {
+  display: grid;
+  gap: 8px;
+}
+
+.enrich-row {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  align-items: start;
+  gap: 10px;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.enrich-row span {
+  display: grid;
+  gap: 4px;
+}
+
+.enrich-row small,
+.enrich-row em {
+  color: #64748b;
+  font-style: normal;
 }
 
 .form-error {

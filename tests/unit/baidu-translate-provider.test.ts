@@ -2,6 +2,28 @@ import { describe, expect, it, vi } from "vitest";
 import { baiduTranslateEnrichTerm, buildBaiduTtsUrl, parseBaiduTranslateResponse } from "@/lib/enrichment/baidu-translate-provider";
 
 describe("parseBaiduTranslateResponse", () => {
+  it("parses Baidu web suggestion data without API keys", () => {
+    const parsed = parseBaiduTranslateResponse(
+      {
+        errno: 0,
+        data: [
+          {
+            k: "care",
+            v: "n. 照顾，照料；小心，谨慎；关心 v. 关心，关怀；在乎，介意",
+          },
+        ],
+      },
+      { text: "care", termType: "word", meanings: [] },
+    );
+
+    expect(parsed.phoneticSymbol).toBeUndefined();
+    expect(parsed.pronunciationUrl).toBe(buildBaiduTtsUrl("care"));
+    expect(parsed.meanings).toMatchObject([
+      { partOfSpeech: "noun", chineseMeaning: "照顾，照料；小心，谨慎；关心" },
+      { partOfSpeech: "verb", chineseMeaning: "关心，关怀；在乎，介意" },
+    ]);
+  });
+
   it("parses rich word dictionary data with phonetic, meanings, and examples", () => {
     const parsed = parseBaiduTranslateResponse(
       {
@@ -60,7 +82,7 @@ describe("parseBaiduTranslateResponse", () => {
 });
 
 describe("baiduTranslateEnrichTerm", () => {
-  it("calls the configured Baidu endpoint and parses the response", async () => {
+  it("calls the Baidu web endpoint without API keys and parses the response", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ trans_result: [{ dst: "照顾" }] }), {
         status: 200,
@@ -71,16 +93,16 @@ describe("baiduTranslateEnrichTerm", () => {
     const enriched = await baiduTranslateEnrichTerm(
       { text: "care", termType: "word", meanings: [] },
       {
-        appId: "appid",
-        secretKey: "secret",
-        endpoint: "https://example.test/translate",
+        endpoint: "https://example.test/sug",
         fetchImpl: fetchMock,
       },
     );
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    const calls = fetchMock.mock.calls as unknown as [[string]];
-    expect(calls[0][0]).toContain("https://example.test/translate?");
+    const calls = fetchMock.mock.calls as unknown as [[string, RequestInit]];
+    expect(calls[0][0]).toBe("https://example.test/sug");
+    expect(calls[0][1].method).toBe("POST");
+    expect(String(calls[0][1].body)).toContain("kw=care");
     expect(enriched.meanings[0].chineseMeaning).toBe("照顾");
   });
 });
