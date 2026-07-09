@@ -55,14 +55,14 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
         {selectedGroup ? (
           <form action={parseImportAction} className="panel teacher-import-panel">
             <input type="hidden" name="targetGroupId" value={selectedGroup.id} />
-            <label htmlFor="file">上传 PDF / Word / TXT 文件</label>
+            <label htmlFor="file">上传 MD/TXT 新增词条，或 PDF/Word 补充匹配</label>
             <input
               id="file"
               name="file"
               type="file"
-              accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".md,.markdown,.pdf,.docx,.txt,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             />
-            <label htmlFor="content">粘贴导入内容</label>
+            <label htmlFor="content">粘贴 MD/TXT 导入内容</label>
             <textarea id="content" name="content" rows={6} />
             <button type="submit">解析到当前分类</button>
           </form>

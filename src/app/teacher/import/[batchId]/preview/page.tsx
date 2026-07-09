@@ -11,6 +11,7 @@ export default async function ImportPreviewPage({ params }: { params: Promise<{ 
     <main className="page">
       <h1>导入预览</h1>
       {batch ? <p>目标分类：{batch.group.name}</p> : null}
+      {batch?.sourceType === "supplement" ? <p>当前为补充匹配模式：只会更新已存在的英文词条，不会新增 PDF/Word 中的英文。</p> : null}
       <div className="table">
         {rows.map((row, index) => (
           <article className="row" key={`${row.text}-${index}`}>
