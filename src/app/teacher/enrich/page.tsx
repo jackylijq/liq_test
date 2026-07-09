@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { enrichTeacherTermsAction } from "./actions";
-import { getTeacherGroups, getTeacherGroupTerms, selectTeacherGroup } from "@/lib/teacher/groups";
+import {
+  getTeacherGroups,
+  getTeacherGroupScope,
+  getTeacherGroupTerms,
+  selectTeacherGroup,
+  sortTeacherTermsForEnrichment,
+} from "@/lib/teacher/groups";
 import { getMeaningLines } from "@/lib/terms/display";
 
 type TeacherEnrichPageProps = {
@@ -11,7 +17,9 @@ export default async function TeacherEnrichPage({ searchParams }: TeacherEnrichP
   const params = await searchParams;
   const groups = await getTeacherGroups();
   const selectedGroup = selectTeacherGroup(groups, params.groupId);
-  const terms = selectedGroup ? await getTeacherGroupTerms(selectedGroup.id) : [];
+  const requestedScope = params.groupId ? await getTeacherGroupScope(params.groupId) : null;
+  const selectedScope = requestedScope ?? (selectedGroup ? await getTeacherGroupScope(selectedGroup.id) : null);
+  const terms = selectedScope ? sortTeacherTermsForEnrichment(await getTeacherGroupTerms(selectedScope.id)) : [];
 
   return (
     <main className="page">
@@ -19,16 +27,16 @@ export default async function TeacherEnrichPage({ searchParams }: TeacherEnrichP
         <div className="import-page-header">
           <div>
             <p className="eyebrow">补齐分类</p>
-            <h1>{selectedGroup?.name ?? "暂无分类"}</h1>
+            <h1>{selectedScope?.displayName ?? "暂无分类"}</h1>
           </div>
-          <Link href={`/teacher${selectedGroup ? `?groupId=${selectedGroup.id}` : ""}`}>返回分类</Link>
+          <Link href={selectedScope?.teacherHref ?? "/teacher"}>返回分类</Link>
         </div>
 
         {params.error === "empty-selection" ? <p className="form-error">请至少勾选一条需要补齐的内容。</p> : null}
 
-        {selectedGroup ? (
+        {selectedScope ? (
           <form action={enrichTeacherTermsAction} className="enrich-form">
-            <input type="hidden" name="targetGroupId" value={selectedGroup.id} />
+            <input type="hidden" name="targetGroupId" value={selectedScope.id} />
             <div className="enrich-actions">
               <button name="mode" type="submit" value="selected">
                 确认补齐选中

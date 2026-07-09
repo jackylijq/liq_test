@@ -24,6 +24,7 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
   const summary = summarizeTeacherTerms(terms);
   const visibleTerms = terms;
   const contentTitle = selectedCategory?.name ?? selectedUnit?.name ?? selectedGroup?.name ?? "暂无分类";
+  const enrichHref = contentGroupId ? `/teacher/enrich?groupId=${contentGroupId}` : "/teacher/enrich";
 
   return (
     <main className="teacher-workbench">
@@ -54,7 +55,7 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
                 <Link className="primary-link" href={`/teacher/import?groupId=${selectedGroup.id}`}>
                   新增内容
                 </Link>
-                <Link className="secondary-link" href={`/teacher/enrich?groupId=${selectedGroup.id}`}>
+                <Link className="secondary-link" href={enrichHref}>
                   补齐
                 </Link>
               </>

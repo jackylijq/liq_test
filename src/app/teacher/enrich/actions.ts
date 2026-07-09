@@ -5,6 +5,7 @@ import { enrichTermDraft } from "@/lib/enrichment/provider";
 import { prisma } from "@/lib/db";
 import type { MeaningDraft, TermDraft, TermType } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
+import { getTeacherGroupScope, getTeacherGroupScopeIds, sortTeacherTermsForEnrichment } from "@/lib/teacher/groups";
 
 type DbTerm = Awaited<ReturnType<typeof getTermsForEnrichment>>[number];
 
@@ -23,18 +24,21 @@ export async function enrichTeacherTermsAction(formData: FormData) {
     await saveEnrichedTerm(term, enriched);
   }
 
-  redirect(`/teacher?groupId=${targetGroupId}`);
+  const scope = await getTeacherGroupScope(targetGroupId);
+  redirect(scope?.teacherHref ?? `/teacher?groupId=${targetGroupId}`);
 }
 
 async function getTermsForEnrichment(groupId: string, selectedIds?: string[]) {
-  return prisma.term.findMany({
+  const groupIds = await getTeacherGroupScopeIds(groupId);
+  const terms = await prisma.term.findMany({
     where: {
-      groups: { some: { groupId } },
+      groups: { some: { groupId: { in: groupIds } } },
       ...(selectedIds ? { id: { in: selectedIds } } : {}),
     },
     include: { meanings: true },
     orderBy: [{ termType: "asc" }, { text: "asc" }],
   });
+  return sortTeacherTermsForEnrichment(terms);
 }
 
 function parseFieldSourcesJson(json: string): MeaningDraft["fieldSources"] {

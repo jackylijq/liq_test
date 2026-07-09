@@ -28,6 +28,25 @@ export type TeacherTermForSummary = {
   }>;
 };
 
+export type TeacherTermForEnrichmentSort = {
+  text: string;
+  termType: string;
+  meanings: Array<{
+    chineseMeaning: string | null;
+    fieldSourcesJson?: string | null;
+  }>;
+};
+
+export type TeacherGroupScope = {
+  id: string;
+  name: string;
+  displayName: string;
+  teacherHref: string;
+  rootGroupId: string;
+  unitId?: string;
+  categoryId?: string;
+};
+
 export function selectTeacherGroup<T extends { id: string }>(
   groups: T[],
   selectedGroupId?: string | null,
@@ -61,6 +80,18 @@ export function summarizeTeacherTerms(terms: TeacherTermForSummary[]) {
   );
 }
 
+export function sortTeacherTermsForEnrichment<T extends TeacherTermForEnrichmentSort>(terms: T[]) {
+  return [...terms].sort((left, right) => {
+    const leftMissing = hasNoVisibleChineseMeaning(left) ? 0 : 1;
+    const rightMissing = hasNoVisibleChineseMeaning(right) ? 0 : 1;
+    if (leftMissing !== rightMissing) return leftMissing - rightMissing;
+
+    const typeOrder = left.termType.localeCompare(right.termType);
+    if (typeOrder !== 0) return typeOrder;
+    return left.text.localeCompare(right.text);
+  });
+}
+
 export async function getTeacherGroups(): Promise<TeacherGroupOption[]> {
   await ensureDefaultTeacherGroups();
   const groups = await prisma.group.findMany({
@@ -75,11 +106,61 @@ export async function getTeacherGroups(): Promise<TeacherGroupOption[]> {
 }
 
 export async function getTeacherGroupTerms(groupId: string) {
+  const groupIds = await getTeacherGroupScopeIds(groupId);
   return prisma.term.findMany({
-    where: { groups: { some: { groupId } } },
+    where: { groups: { some: { groupId: { in: groupIds } } } },
     include: { meanings: true },
     orderBy: [{ termType: "asc" }, { text: "asc" }],
   });
+}
+
+export async function getTeacherGroupScope(groupId: string): Promise<TeacherGroupScope | null> {
+  const group = await prisma.group.findUnique({
+    where: { id: groupId },
+    include: {
+      parent: {
+        include: {
+          parent: true,
+        },
+      },
+    },
+  });
+
+  if (!group) return null;
+
+  const root = group.parent?.parent ?? group.parent ?? group;
+  const unit = group.parent?.parent ? group.parent : group.parent ? group : null;
+  const category = group.parent?.parent ? group : null;
+  const displayName = category ? formatTeacherCategoryName(category.name) : group.name;
+  const searchParams = new URLSearchParams({ groupId: root.id });
+  if (unit) searchParams.set("unitId", unit.id);
+  if (category) searchParams.set("categoryId", category.id);
+
+  return {
+    id: group.id,
+    name: group.name,
+    displayName,
+    teacherHref: `/teacher?${searchParams.toString()}`,
+    rootGroupId: root.id,
+    unitId: unit?.id,
+    categoryId: category?.id,
+  };
+}
+
+export async function getTeacherGroupScopeIds(groupId: string) {
+  const groupIds = [groupId];
+  let frontier = [groupId];
+
+  while (frontier.length > 0) {
+    const children = await prisma.group.findMany({
+      where: { parentId: { in: frontier } },
+      select: { id: true },
+    });
+    frontier = children.map((child) => child.id);
+    groupIds.push(...frontier);
+  }
+
+  return groupIds;
 }
 
 export async function getTeacherContentOutline(gradeGroupId: string): Promise<TeacherUnitFilter[]> {
@@ -110,6 +191,25 @@ export function formatTeacherCategoryName(name: string) {
     .replace(/\s+-\s+/g, "-")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function hasNoVisibleChineseMeaning(term: TeacherTermForEnrichmentSort) {
+  if (term.meanings.length === 0) return true;
+  return !term.meanings.some((meaning) => {
+    const chineseMeaning = meaning.chineseMeaning?.trim();
+    if (!chineseMeaning) return false;
+    return getFieldSource(meaning.fieldSourcesJson, "chineseMeaning") !== "mock_generated";
+  });
+}
+
+function getFieldSource(json: string | null | undefined, fieldName: string) {
+  if (!json) return undefined;
+  try {
+    const parsed = JSON.parse(json) as Record<string, string | undefined>;
+    return parsed[fieldName];
+  } catch {
+    return undefined;
+  }
 }
 
 async function ensureDefaultTeacherGroups() {
