@@ -1,6 +1,7 @@
 import type { Browser, BrowserContext, Page } from "playwright";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
+import { choosePhoneticSymbol } from "@/lib/terms/phonetics";
 import { buildBaiduTtsUrl } from "./baidu-translate-provider";
 
 type BaiduBrowserTranslateOptions = {
@@ -391,17 +392,6 @@ function collectPhoneticSymbol(result: Record<string, unknown> | undefined) {
   return parts.join(" ") || undefined;
 }
 
-function choosePhoneticSymbol(termText: string, existing: string | undefined, incoming: string | undefined) {
-  if (!existing) return incoming;
-  if (incoming && isPlaceholderPhonetic(termText, existing)) return incoming;
-  return existing;
-}
-
-function isPlaceholderPhonetic(termText: string, phoneticSymbol: string) {
-  const normalizedPhonetic = phoneticSymbol.replace(/^\/|\/$/g, "").trim().toLowerCase();
-  return normalizedPhonetic === termText.trim().toLowerCase();
-}
-
 function fieldSources(): MeaningDraft["fieldSources"] {
   return { chineseMeaning: "web_lookup" };
 }
@@ -502,7 +492,7 @@ export function parseBaiduBrowserTranslateResponse(response: unknown, draft: Ter
 
   return {
     ...draft,
-    phoneticSymbol: draft.termType === "word" ? choosePhoneticSymbol(draft.text, draft.phoneticSymbol, collectPhoneticSymbol(result)) : undefined,
+    phoneticSymbol: draft.termType === "word" ? (choosePhoneticSymbol(draft.text, draft.phoneticSymbol, collectPhoneticSymbol(result)) ?? undefined) : undefined,
     pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? buildBaiduTtsUrl(draft.text)) : undefined,
     meanings: structuredMeanings.length ? structuredMeanings : mergeBrowserMeaning(draft, chineseMeaning, reviewExplanation),
   };

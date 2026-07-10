@@ -2,6 +2,7 @@ import type { TermDraft } from "@/lib/types";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 import { baiduBrowserTranslateTerm } from "./baidu-browser-provider";
 import { baiduTranslateEnrichTerm } from "./baidu-translate-provider";
+import { enrichDictionaryPhonetic } from "./dictionary-provider";
 import { mockEnrichTerm } from "./mock-provider";
 import { openAiEnrichTerm } from "./openai-provider";
 
@@ -48,6 +49,7 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
   });
 
   let baiduDraft: TermDraft | undefined;
+  let phoneticDraft: TermDraft | undefined;
 
   try {
     baiduDraft = await baiduTranslateEnrichTerm(draft);
@@ -56,7 +58,11 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
       draft: debugTermDraft(baiduDraft),
     });
     if (!options.useBrowser && hasWebLookupMeaning(baiduDraft)) {
-      const enrichedDraft = await mockEnrichTerm(baiduDraft);
+      const dictionaryDraft = await enrichDictionaryPhonetic(baiduDraft);
+      logTeacherDebug("provider", "dictionary-phonetic:after", {
+        draft: debugTermDraft(dictionaryDraft),
+      });
+      const enrichedDraft = await mockEnrichTerm(dictionaryDraft);
       logTeacherDebug("provider", "return:baidu-http-with-mock-fields", {
         draft: debugTermDraft(enrichedDraft),
       });
@@ -67,12 +73,17 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
     // The web endpoint is best-effort and can change or throttle; keep imports usable.
   }
 
+  phoneticDraft = await enrichDictionaryPhonetic(baiduDraft ?? draft);
+  logTeacherDebug("provider", "dictionary-phonetic:after", {
+    draft: debugTermDraft(phoneticDraft),
+  });
+
   if (options.useBrowser) {
     try {
       logTeacherDebug("provider", "browser:before", {
-        draft: debugTermDraft(baiduDraft ?? draft),
+        draft: debugTermDraft(phoneticDraft),
       });
-      const browserDraft = await baiduBrowserTranslateTerm(baiduDraft ?? draft);
+      const browserDraft = await enrichDictionaryPhonetic(await baiduBrowserTranslateTerm(phoneticDraft));
       logTeacherDebug("provider", "browser:after", {
         hasWebLookupMeaning: hasWebLookupMeaning(browserDraft),
         draft: debugTermDraft(browserDraft),
@@ -91,9 +102,9 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
 
   if (!process.env.OPENAI_API_KEY) {
     logTeacherDebug("provider", "fallback:mock:no-openai-key", {
-      draft: debugTermDraft(baiduDraft ?? draft),
+      draft: debugTermDraft(phoneticDraft),
     });
-    const fallbackDraft = await mockEnrichTerm(baiduDraft ?? draft);
+    const fallbackDraft = await mockEnrichTerm(phoneticDraft);
     logTeacherDebug("provider", "return:mock", {
       draft: debugTermDraft(fallbackDraft),
     });
@@ -102,9 +113,9 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
 
   try {
     logTeacherDebug("provider", "openai:before", {
-      draft: debugTermDraft(baiduDraft ?? draft),
+      draft: debugTermDraft(phoneticDraft),
     });
-    const openAiDraft = await openAiEnrichTerm(baiduDraft ?? draft);
+    const openAiDraft = await openAiEnrichTerm(phoneticDraft);
     logTeacherDebug("provider", "return:openai", {
       draft: debugTermDraft(openAiDraft),
     });
@@ -112,9 +123,9 @@ export async function enrichTermDraft(draft: TermDraft, options: EnrichTermOptio
   } catch (error) {
     logTeacherDebug("provider", "openai:error", debugError(error));
     logTeacherDebug("provider", "fallback:mock:openai-error", {
-      draft: debugTermDraft(baiduDraft ?? draft),
+      draft: debugTermDraft(phoneticDraft),
     });
-    const fallbackDraft = await mockEnrichTerm(baiduDraft ?? draft);
+    const fallbackDraft = await mockEnrichTerm(phoneticDraft);
     logTeacherDebug("provider", "return:mock", {
       draft: debugTermDraft(fallbackDraft),
     });

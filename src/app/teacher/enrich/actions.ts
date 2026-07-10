@@ -5,6 +5,7 @@ import { enrichTermDraft } from "@/lib/enrichment/provider";
 import { prisma } from "@/lib/db";
 import type { MeaningDraft, TermDraft, TermType } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
+import { choosePhoneticSymbol } from "@/lib/terms/phonetics";
 import { getTeacherGroupScope, getTeacherGroupScopeIds, sortTeacherTermsForEnrichment } from "@/lib/teacher/groups";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 
@@ -192,17 +193,6 @@ async function saveEnrichedTerm(term: DbTerm, draft: TermDraft) {
   }
 
   await deleteStaleLookupMeanings(term, draft, savedMeaningIds);
-}
-
-function choosePhoneticSymbol(termText: string, existing: string | null, incoming: string | undefined) {
-  if (!existing) return incoming ?? null;
-  if (incoming && isPlaceholderPhonetic(termText, existing)) return incoming;
-  return existing;
-}
-
-function isPlaceholderPhonetic(termText: string, phoneticSymbol: string) {
-  const normalizedPhonetic = phoneticSymbol.replace(/^\/|\/$/g, "").trim().toLowerCase();
-  return normalizedPhonetic === termText.trim().toLowerCase();
 }
 
 function findExistingMeaning(term: DbTerm, meaning: MeaningDraft, excludedIds: string[]) {

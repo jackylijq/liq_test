@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
+import { choosePhoneticSymbol } from "@/lib/terms/phonetics";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -313,7 +314,7 @@ async function applySupplementDraft(client: DbClient, draft: TermDraft) {
   await client.term.update({
     where: { id: term.id },
     data: {
-      phoneticSymbol: term.phoneticSymbol ?? (draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null),
+      phoneticSymbol: draft.termType === "word" ? choosePhoneticSymbol(draft.text, term.phoneticSymbol, draft.phoneticSymbol) : null,
       pronunciationUrl: term.pronunciationUrl ?? (draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null),
     },
   });

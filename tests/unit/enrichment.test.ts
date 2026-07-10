@@ -7,9 +7,15 @@ describe("mockEnrichTerm", () => {
   it("fills missing word fields", async () => {
     const draft: TermDraft = { text: "apple", termType: "word", meanings: [] };
     const enriched = await mockEnrichTerm(draft);
-    expect(enriched.phoneticSymbol).toBeTruthy();
+    expect(enriched.phoneticSymbol).toBeUndefined();
     expect(enriched.meanings[0].partOfSpeech).toBeTruthy();
     expect(enriched.meanings[0].chineseMeaning).toBeTruthy();
+  });
+
+  it("clears placeholder word phonetics", async () => {
+    const draft: TermDraft = { text: "eagle", termType: "word", phoneticSymbol: "/eagle/", meanings: [] };
+    const enriched = await mockEnrichTerm(draft);
+    expect(enriched.phoneticSymbol).toBeUndefined();
   });
 
   it("fills missing Chinese meaning and example sentence on parsed word meanings", async () => {

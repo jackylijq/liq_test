@@ -1,4 +1,5 @@
 import type { TermDraft } from "@/lib/types";
+import { choosePhoneticSymbol } from "@/lib/terms/phonetics";
 
 export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
   if (draft.termType === "sentence") {
@@ -58,7 +59,7 @@ export async function mockEnrichTerm(draft: TermDraft): Promise<TermDraft> {
 
   return {
     ...draft,
-    phoneticSymbol: draft.phoneticSymbol ?? `/${draft.text}/`,
+    phoneticSymbol: choosePhoneticSymbol(draft.text, draft.phoneticSymbol, undefined) ?? undefined,
     pronunciationUrl: draft.pronunciationUrl ?? `https://fanyi.baidu.com/gettts?lan=en&text=${encodeURIComponent(draft.text)}&spd=3&source=web`,
     meanings: draft.meanings.length
       ? draft.meanings.map((meaning) => ({
