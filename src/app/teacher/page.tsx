@@ -3,13 +3,14 @@ import {
   getTeacherContentOutline,
   getTeacherGroups,
   getTeacherGroupTerms,
+  getTeacherImportBatchTerms,
   selectTeacherGroup,
   summarizeTeacherTerms,
 } from "@/lib/teacher/groups";
 import { getMeaningLines, getVisibleExampleSentences, getVisibleExplanationLines, shouldShowUsageContext } from "@/lib/terms/display";
 
 type TeacherPageProps = {
-  searchParams: Promise<{ groupId?: string; unitId?: string; categoryId?: string; error?: string }>;
+  searchParams: Promise<{ groupId?: string; unitId?: string; categoryId?: string; importBatchId?: string; error?: string }>;
 };
 
 export default async function TeacherPage({ searchParams }: TeacherPageProps) {
@@ -20,7 +21,12 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
   const selectedUnit = outline.find((unit) => unit.id === params.unitId || unit.categories.some((category) => category.id === params.categoryId));
   const selectedCategory = selectedUnit?.categories.find((category) => category.id === params.categoryId);
   const contentGroupId = selectedCategory?.id ?? selectedUnit?.id ?? selectedGroup?.id;
-  const terms = contentGroupId ? await getTeacherGroupTerms(contentGroupId) : [];
+  const showingImportedBatch = Boolean(params.importBatchId);
+  const terms = params.importBatchId
+    ? await getTeacherImportBatchTerms(params.importBatchId)
+    : contentGroupId
+      ? await getTeacherGroupTerms(contentGroupId)
+      : [];
   const summary = summarizeTeacherTerms(terms);
   const visibleTerms = terms;
   const contentTitle = selectedCategory?.name ?? selectedUnit?.name ?? selectedGroup?.name ?? "暂无分类";
@@ -70,6 +76,12 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
         </header>
 
         {params.error === "empty-import" ? <p className="form-error">请先上传文件或填写导入内容。</p> : null}
+        {showingImportedBatch && selectedGroup ? (
+          <section className="import-success-panel">
+            <span>已导入以下内容。</span>
+            <Link href={`/teacher?groupId=${selectedGroup.id}`}>查看当前分类全部内容</Link>
+          </section>
+        ) : null}
 
         {!selectedGroup ? <section className="panel">暂无分类，请先运行种子数据。</section> : null}
 

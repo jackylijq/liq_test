@@ -310,6 +310,23 @@ select {
   min-height: 120px;
 }
 
+.import-success-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  padding: 12px 14px;
+}
+
+.import-success-panel a {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
 .import-page-header {
   display: flex;
   align-items: center;

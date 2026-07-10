@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { normalizeTermText } from "@/lib/terms/normalize";
 import { defaultGradeGroupNames } from "./default-groups";
 
 export type TeacherGroupOption = {
@@ -116,6 +117,39 @@ export async function getTeacherGroupTerms(groupId: string) {
     },
     orderBy: [{ termType: "asc" }, { text: "asc" }],
   });
+}
+
+export async function getTeacherImportBatchTerms(batchId: string) {
+  const rows = await prisma.importRow.findMany({
+    where: { batchId },
+    orderBy: { rowIndex: "asc" },
+    select: { enrichedJson: true },
+  });
+  const drafts = rows.map((row) => JSON.parse(row.enrichedJson) as { text: string; termType: string });
+  const keys = drafts.map((draft) => ({
+    normalizedText: normalizeTermText(draft.text),
+    termType: draft.termType,
+  }));
+  if (keys.length === 0) return [];
+
+  const terms = await prisma.term.findMany({
+    where: {
+      OR: keys.map((key) => ({
+        normalizedText: key.normalizedText,
+        termType: key.termType,
+      })),
+    },
+    include: {
+      meanings: {
+        orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  });
+
+  const byKey = new Map(terms.map((term) => [`${term.termType}:${term.normalizedText}`, term]));
+  return keys
+    .map((key) => byKey.get(`${key.termType}:${key.normalizedText}`))
+    .filter((term): term is NonNullable<typeof term> => Boolean(term));
 }
 
 export async function getTeacherGroupScope(groupId: string): Promise<TeacherGroupScope | null> {

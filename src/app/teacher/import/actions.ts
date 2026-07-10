@@ -277,7 +277,7 @@ export async function confirmImportAction(formData: FormData) {
     rowCount: batch.rows.length,
     durationMs: Date.now() - startedAt,
   });
-  redirect(`/teacher?groupId=${batch.targetGroupId}`);
+  redirect(`/teacher?groupId=${batch.targetGroupId}&importBatchId=${batch.id}`);
 }
 
 function debugTermDraft(row: TermDraft) {
