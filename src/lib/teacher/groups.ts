@@ -114,9 +114,6 @@ export async function getTeacherGroupTerms(groupId: string) {
       meanings: {
         orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }],
       },
-      groups: {
-        include: { group: true },
-      },
     },
     orderBy: [{ termType: "asc" }, { text: "asc" }],
   });
@@ -145,9 +142,6 @@ export async function getTeacherImportBatchTerms(batchId: string) {
     include: {
       meanings: {
         orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }],
-      },
-      groups: {
-        include: { group: true },
       },
     },
   });

@@ -553,38 +553,11 @@ select {
   gap: 8px;
 }
 
-.teacher-category-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
 .teacher-unit-tabs a.active,
 .teacher-filter-tabs a.active {
   background: #2563eb;
   color: #fff;
   border-color: #2563eb;
-  font-weight: 700;
-}
-
-.teacher-rename-form {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.teacher-rename-form input {
-  width: 180px;
-  min-width: 120px;
-}
-
-.teacher-rename-form button,
-.teacher-term-category-form button {
-  border: 1px solid #cfd5df;
-  border-radius: 8px;
-  background: #fff;
-  padding: 8px 10px;
   font-weight: 700;
 }
 
@@ -615,29 +588,6 @@ select {
 
 .teacher-term-card p {
   margin: 8px 0 0;
-}
-
-.teacher-term-category-form {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid #eef2f7;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.teacher-term-category-form label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.teacher-term-category-form select {
-  min-width: 260px;
 }
 
 @media (max-width: 760px) {
@@ -706,12 +656,6 @@ select {
     border-right: 0;
     border-bottom: 1px solid #e5e7eb;
     padding: 14px;
-  }
-
-  .teacher-rename-form input,
-  .teacher-term-category-form select {
-    width: 100%;
-    min-width: 0;
   }
 
   .teacher-groups {
