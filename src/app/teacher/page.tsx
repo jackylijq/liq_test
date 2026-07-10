@@ -8,6 +8,7 @@ import {
   summarizeTeacherTerms,
 } from "@/lib/teacher/groups";
 import { getMeaningLines, getVisibleExampleSentences, getVisibleExplanationLines, shouldShowUsageContext } from "@/lib/terms/display";
+import { buildPronunciationAudioUrl } from "@/lib/terms/pronunciation";
 
 type TeacherPageProps = {
   searchParams: Promise<{ groupId?: string; unitId?: string; categoryId?: string; importBatchId?: string; error?: string }>;
@@ -123,8 +124,8 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
                 <div>
                   <strong>{term.text}</strong>
                   {term.termType === "word" && term.phoneticSymbol ? <span>{term.phoneticSymbol}</span> : null}
-                  {term.termType === "word" && term.pronunciationUrl ? (
-                    <audio aria-label={`${term.text} 发音`} controls preload="none" src={term.pronunciationUrl} />
+                  {term.termType === "word" ? (
+                    <audio aria-label={`${term.text} 发音`} controls preload="none" src={buildPronunciationAudioUrl(term.text)} />
                   ) : null}
                   {term.termType === "word" ? <span>{term.meanings[0]?.partOfSpeech}</span> : null}
                   {term.termType === "phrase" ? <span>短语</span> : null}
