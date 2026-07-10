@@ -282,6 +282,7 @@ describe("parseBaiduBrowserTranslateResponse", () => {
 describe("baiduBrowserTranslateTerm", () => {
   afterEach(() => {
     vi.doUnmock("playwright");
+    vi.unstubAllGlobals();
     vi.resetModules();
   });
 
@@ -366,6 +367,66 @@ describe("baiduBrowserTranslateTerm", () => {
       chineseMeaning: "——他们来自哪里？——上面写着南极洲。",
       exampleSentence: "—Where are they from? —It says Antarctica.",
       fieldSources: { chineseMeaning: "web_lookup", exampleSentence: "parsed" },
+    });
+  });
+
+  it("stops waiting when Baidu returns a security verification page", async () => {
+    vi.resetModules();
+    const pageText = [
+      "文本翻译",
+      "It helps them keep warm.",
+      "AI大模型翻译",
+      "AI论文精翻",
+      "Baidu Security Verification",
+      "Verification failed, please try again",
+      "Click the numbers from largest to smallest",
+    ].join("\n");
+    vi.stubGlobal("document", { body: { innerText: pageText } });
+    const bodyLocator = {
+      innerText: vi.fn(async () => pageText),
+    };
+    const page = {
+      setDefaultTimeout: vi.fn(),
+      goto: vi.fn(async () => undefined),
+      url: vi.fn(() => "https://fanyi.baidu.com/mtpe-individual/transText"),
+      title: vi.fn(async () => "百度翻译"),
+      waitForFunction: vi.fn(async (predicate: (query: string) => boolean, query: string) => {
+        expect(predicate(query)).toBe(true);
+      }),
+      locator: vi.fn(() => bodyLocator),
+      close: vi.fn(async () => undefined),
+    };
+    const context = {
+      newPage: vi.fn(async () => page),
+      close: vi.fn(async () => undefined),
+    };
+    const browser = {
+      newContext: vi.fn(async () => context),
+    };
+    vi.doMock("playwright", () => ({
+      chromium: {
+        launch: vi.fn(async () => browser),
+      },
+    }));
+    const { baiduBrowserTranslateTerm: translateWithBrowser } = await import("@/lib/enrichment/baidu-browser-provider");
+
+    const translated = await translateWithBrowser({
+      text: "It helps them keep warm.",
+      termType: "sentence",
+      meanings: [
+        {
+          chineseMeaning: "",
+          exampleSentence: "It helps them keep warm.",
+          fieldSources: { exampleSentence: "parsed" },
+        },
+      ],
+    });
+
+    expect(page.waitForFunction).toHaveBeenCalledWith(expect.any(Function), "It helps them keep warm.", { timeout: 10000 });
+    expect(translated.meanings[0]).toMatchObject({
+      chineseMeaning: "",
+      exampleSentence: "It helps them keep warm.",
+      fieldSources: { exampleSentence: "parsed" },
     });
   });
 });

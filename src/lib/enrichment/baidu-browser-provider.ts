@@ -17,7 +17,7 @@ type BaiduBrowserResponse = {
 let browserPromise: Promise<Browser> | undefined;
 
 function getTimeout(options: BaiduBrowserTranslateOptions) {
-  return options.timeoutMs ?? Number(process.env.BAIDU_BROWSER_TRANSLATE_TIMEOUT_MS ?? 30000);
+  return options.timeoutMs ?? Number(process.env.BAIDU_BROWSER_TRANSLATE_TIMEOUT_MS ?? 10000);
 }
 
 async function getBrowser() {
@@ -35,6 +35,14 @@ async function getBrowser() {
 
 export function buildBaiduTranslatePageUrl(text: string) {
   return `https://fanyi.baidu.com/mtpe-individual/transText?query=${encodeURIComponent(text)}&lang=en2zh&ext_channel=pcPinzhuan#/`;
+}
+
+function isBaiduSecurityVerificationText(text: string) {
+  return (
+    text.includes("Baidu Security Verification") ||
+    text.includes("Verification failed") ||
+    text.includes("Click the numbers from largest to smallest")
+  );
 }
 
 async function withBaiduPage<T>(text: string, timeoutMs: number, callback: (page: Page) => Promise<T>) {
@@ -75,6 +83,13 @@ async function waitForBaiduRenderedTranslation(page: Page, text: string, timeout
   await page.waitForFunction(
     (query) => {
       const bodyText = document.body?.innerText ?? "";
+      if (
+        bodyText.includes("Baidu Security Verification") ||
+        bodyText.includes("Verification failed") ||
+        bodyText.includes("Click the numbers from largest to smallest")
+      ) {
+        return true;
+      }
       if (!bodyText.includes(query)) return false;
       if (bodyText.includes("简明释义") || bodyText.includes("网络") || /英\/[^\n]+/.test(bodyText)) return true;
 
@@ -102,6 +117,13 @@ async function translateWithBaiduBrowser(text: string, timeoutMs: number) {
       length: pageText.length,
       preview: pageText.slice(0, 2000),
     });
+    if (isBaiduSecurityVerificationText(pageText)) {
+      logTeacherDebug("provider", "browser-provider:security-blocked", {
+        text,
+        length: pageText.length,
+        preview: pageText.slice(0, 1000),
+      });
+    }
     return parseBaiduRenderedPageText(pageText, text);
   });
 }
