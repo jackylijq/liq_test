@@ -541,6 +541,10 @@ function parseLine(line: string, context: ParseContext = {}): TermDraft | undefi
   if (!/[A-Za-z]/.test(trimmed)) return undefined;
   if (/^(modal|interj|conj|prep|pron|adj|adv|n|v)\./i.test(trimmed)) return undefined;
 
+  if (!context.mode && isBareEnglishSentence(trimmed)) {
+    return parseSentenceLine(trimmed);
+  }
+
   const compact = parseCompactLine(trimmed, context);
   if (compact) return compact;
 
@@ -582,6 +586,13 @@ function parseLine(line: string, context: ParseContext = {}): TermDraft | undefi
       },
     ],
   };
+}
+
+function isBareEnglishSentence(line: string) {
+  if (/[\u4e00-\u9fa5]/.test(line)) return false;
+  if (!/[.!?]$/.test(line)) return false;
+  if (/\s(?:modal|interj|conj|prep|pron|adj|adv|n|v)\./i.test(line)) return false;
+  return line.split(/\s+/).filter(Boolean).length >= 4;
 }
 
 function parseSentenceLine(line: string, options: { requireTranslation?: boolean } = {}): TermDraft | undefined {

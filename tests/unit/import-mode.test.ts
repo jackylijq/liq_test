@@ -201,4 +201,40 @@ describe("buildSupplementDrafts", () => {
       },
     ]);
   });
+
+  it("matches sentence supplements with curly apostrophes to existing straight apostrophe sentences", () => {
+    const matched = buildSupplementDrafts(
+      [
+        {
+          text: "I have to hurry to school because I can’t be late for school.",
+          termType: "sentence",
+          meanings: [
+            {
+              chineseMeaning: "我得赶紧去上学，因为不能迟到",
+              exampleSentence: "I have to hurry to school because I can’t be late for school.",
+              fieldSources: { chineseMeaning: "parsed", exampleSentence: "parsed" },
+            },
+          ],
+        },
+      ],
+      [
+        {
+          text: "I have to hurry to school because I can't be late for school.",
+          normalizedText: "i have to hurry to school because i can't be late for school.",
+          termType: "sentence",
+        },
+      ],
+    );
+
+    expect(matched[0]).toMatchObject({
+      text: "I have to hurry to school because I can't be late for school.",
+      termType: "sentence",
+      meanings: [
+        {
+          chineseMeaning: "我得赶紧去上学，因为不能迟到",
+          exampleSentence: "I have to hurry to school because I can't be late for school.",
+        },
+      ],
+    });
+  });
 });

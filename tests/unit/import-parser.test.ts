@@ -196,6 +196,23 @@ SectionB基础过关
     ]);
   });
 
+  it("parses a pasted bare English sentence as a sentence", () => {
+    const rows = parseImportedText("I have to hurry to school because I can’t be late for school.");
+
+    expect(rows).toMatchObject([
+      {
+        text: "I have to hurry to school because I can’t be late for school.",
+        termType: "sentence",
+        meanings: [
+          {
+            chineseMeaning: "",
+            exampleSentence: "I have to hurry to school because I can’t be late for school.",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("splits common compact textbook phrase rows from PDF extraction", () => {
     const rows = parseImportedText(`必会词块
 23.是......的象征beasymbolof

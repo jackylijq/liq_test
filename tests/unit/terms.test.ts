@@ -7,6 +7,12 @@ describe("normalizeTermText", () => {
   it("lowercases latin text and collapses spaces", () => {
     expect(normalizeTermText("  Look   After  ")).toBe("look after");
   });
+
+  it("normalizes curly apostrophes and full-width sentence punctuation", () => {
+    expect(normalizeTermText("I can’t use my phone in class，because I’m learning.")).toBe(
+      "i can't use my phone in class, because i'm learning.",
+    );
+  });
 });
 
 describe("mergeTermDraft", () => {
