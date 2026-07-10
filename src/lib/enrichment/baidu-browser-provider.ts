@@ -1,4 +1,4 @@
-import type { Browser, Page } from "playwright";
+import type { Browser, BrowserContext, Page } from "playwright";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
 import { buildBaiduTtsUrl } from "./baidu-translate-provider";
@@ -39,9 +39,12 @@ export function buildBaiduTranslatePageUrl(text: string) {
 
 async function withBaiduPage<T>(text: string, timeoutMs: number, callback: (page: Page) => Promise<T>) {
   const browser = await getBrowser();
-  const page = await browser.newPage();
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
 
   try {
+    context = await browser.newContext();
+    page = await context.newPage();
     page.setDefaultTimeout(timeoutMs);
     const url = buildBaiduTranslatePageUrl(text);
     logTeacherDebug("provider", "browser-provider:goto:before", { timeoutMs, url });
@@ -50,10 +53,22 @@ async function withBaiduPage<T>(text: string, timeoutMs: number, callback: (page
       url: page.url(),
       title: await page.title().catch(() => ""),
     });
-    await waitForBaiduRenderedTranslation(page, text, timeoutMs);
+    try {
+      await waitForBaiduRenderedTranslation(page, text, timeoutMs);
+    } catch (error) {
+      const pageText = await page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
+      logTeacherDebug("provider", "browser-provider:rendered-translation:timeout", {
+        text,
+        error: error instanceof Error ? { name: error.name, message: error.message } : error,
+        pageTextLength: pageText.length,
+        pageTextPreview: pageText.slice(0, 2000),
+      });
+      throw error;
+    }
     return await callback(page);
   } finally {
-    await page.close().catch(() => undefined);
+    await page?.close().catch(() => undefined);
+    await context?.close().catch(() => undefined);
   }
 }
 
