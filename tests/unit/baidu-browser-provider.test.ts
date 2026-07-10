@@ -1,5 +1,85 @@
 import { describe, expect, it, vi } from "vitest";
-import { baiduBrowserTranslateTerm, parseBaiduBrowserTranslateResponse } from "@/lib/enrichment/baidu-browser-provider";
+import {
+  baiduBrowserTranslateTerm,
+  buildBaiduTranslatePageUrl,
+  parseBaiduBrowserTranslateResponse,
+  parseBaiduRenderedPageText,
+} from "@/lib/enrichment/baidu-browser-provider";
+
+describe("buildBaiduTranslatePageUrl", () => {
+  it("opens Baidu text translation with the real query in the URL", () => {
+    expect(buildBaiduTranslatePageUrl("Across the country")).toBe(
+      "https://fanyi.baidu.com/mtpe-individual/transText?query=Across%20the%20country&lang=en2zh&ext_channel=pcPinzhuan#/",
+    );
+  });
+});
+
+describe("parseBaiduRenderedPageText", () => {
+  it("converts rendered word dictionary text into a browser response", () => {
+    const response = parseBaiduRenderedPageText(
+      [
+        "AI大模型翻译",
+        "关心",
+        "编辑译文",
+        "段落对照",
+        "\"care\" 这个词在中文里可以有多种译法。",
+        "试一试：",
+        "简明释义牛津词典",
+        "care",
+        "英/keə(r)/",
+        "美/ker/",
+        "n.",
+        "照顾，照料；小心，谨慎",
+        "v.",
+        "（对……）关心，关怀；在乎，介意",
+        "第三人称单数：cares",
+      ].join("\n"),
+      "care",
+    );
+
+    const parsed = parseBaiduBrowserTranslateResponse(response, { text: "care", termType: "word", meanings: [] });
+
+    expect(parsed.phoneticSymbol).toBe("英/keə(r)/ 美/ker/");
+    expect(parsed.meanings[0]).toMatchObject({
+      partOfSpeech: "noun",
+      chineseMeaning: "照顾，照料；小心，谨慎",
+      explanation: expect.stringContaining("\"care\" 这个词在中文里可以有多种译法。"),
+    });
+    expect(parsed.meanings[1]).toMatchObject({
+      partOfSpeech: "verb",
+      chineseMeaning: "（对……）关心，关怀；在乎，介意",
+    });
+  });
+
+  it("converts rendered phrase dictionary text into a browser response", () => {
+    const response = parseBaiduRenderedPageText(
+      [
+        "AI大模型翻译",
+        "全国各地",
+        "编辑译文",
+        "段落对照",
+        "\"Across the country\" 这个短语通常表示遍及全国。",
+        "试一试：",
+        "简明释义例句",
+        "Across the country",
+        "英/əˈkrɒs ðə ˈkʌntri/",
+        "美/əˈkrɔːs ðə ˈkʌntri/",
+        "网络",
+        "在全国各地；遍及全国",
+        "例句",
+      ].join("\n"),
+      "Across the country",
+    );
+
+    const parsed = parseBaiduBrowserTranslateResponse(response, { text: "Across the country", termType: "phrase", meanings: [] });
+
+    expect(parsed.meanings[0]).toMatchObject({
+      chineseMeaning: "在全国各地；遍及全国",
+      explanation: expect.stringContaining("通常表示遍及全国"),
+      fieldSources: { chineseMeaning: "web_lookup", explanation: "web_lookup" },
+    });
+  });
+});
 
 describe("parseBaiduBrowserTranslateResponse", () => {
   it("parses browser v2Fetch word phonetics and part-of-speech meanings", () => {

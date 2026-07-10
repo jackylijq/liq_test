@@ -14,10 +14,6 @@ type BaiduBrowserResponse = {
   result?: string | Record<string, unknown>;
 };
 
-type BaiduBrowserFunctionName = "v2Fetch" | "v2FetchJSON";
-
-const browserFetchFunctionNames: BaiduBrowserFunctionName[] = ["v2Fetch", "v2FetchJSON"];
-
 let browserPromise: Promise<Browser> | undefined;
 
 function getTimeout(options: BaiduBrowserTranslateOptions) {
@@ -37,106 +33,51 @@ async function getBrowser() {
   return browserPromise;
 }
 
-async function withBaiduPage<T>(timeoutMs: number, callback: (page: Page) => Promise<T>) {
+export function buildBaiduTranslatePageUrl(text: string) {
+  return `https://fanyi.baidu.com/mtpe-individual/transText?query=${encodeURIComponent(text)}&lang=en2zh&ext_channel=pcPinzhuan#/`;
+}
+
+async function withBaiduPage<T>(text: string, timeoutMs: number, callback: (page: Page) => Promise<T>) {
   const browser = await getBrowser();
-  const page = await browser.newPage({
-    locale: "zh-CN",
-    viewport: { width: 1280, height: 900 },
-    userAgent:
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-  });
+  const page = await browser.newPage();
 
   try {
     page.setDefaultTimeout(timeoutMs);
-    logTeacherDebug("provider", "browser-provider:goto:before", { timeoutMs });
-    await page.goto("https://fanyi.baidu.com/", { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    const url = buildBaiduTranslatePageUrl(text);
+    logTeacherDebug("provider", "browser-provider:goto:before", { timeoutMs, url });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
     logTeacherDebug("provider", "browser-provider:goto:after", {
       url: page.url(),
       title: await page.title().catch(() => ""),
     });
-    try {
-      await waitForBaiduTokenFetch(page, timeoutMs);
-      logTeacherDebug("provider", "browser-provider:token-fetch:ready", {
-        functions: await getAvailableBaiduFetchFunctions(page),
-      });
-    } catch (error) {
-      logTeacherDebug("provider", "browser-provider:token-fetch:timeout", {
-        error: error instanceof Error ? { name: error.name, message: error.message } : error,
-        functions: await getAvailableBaiduFetchFunctions(page),
-      });
-      throw error;
-    }
+    await waitForBaiduRenderedTranslation(page, text, timeoutMs);
     return await callback(page);
   } finally {
     await page.close().catch(() => undefined);
   }
 }
 
-async function waitForBaiduTokenFetch(page: Page, timeoutMs: number) {
+async function waitForBaiduRenderedTranslation(page: Page, text: string, timeoutMs: number) {
   await page.waitForFunction(
-    (functionNames) =>
-      typeof window !== "undefined" &&
-      functionNames.some((name) => typeof (window as unknown as Record<string, unknown>)[name] === "function"),
-    browserFetchFunctionNames,
+    (query) => {
+      const bodyText = document.body?.innerText ?? "";
+      return bodyText.includes(query) && (bodyText.includes("简明释义") || bodyText.includes("网络") || /英\/[^\n]+/.test(bodyText));
+    },
+    text,
     { timeout: timeoutMs },
   );
 }
 
-async function getAvailableBaiduFetchFunctions(page: Page) {
-  return page
-    .evaluate((functionNames) => {
-      const win = window as unknown as Record<string, unknown>;
-      const expected = functionNames.filter((name) => typeof win[name] === "function");
-      const related = Object.keys(win)
-        .filter((key) => /fetch|acs|token|trans/i.test(key))
-        .sort();
-      return { expected, related };
-    }, browserFetchFunctionNames)
-    .catch(() => ({ expected: [], related: [] }));
-}
-
 async function translateWithBaiduBrowser(text: string, timeoutMs: number) {
-  return withBaiduPage(timeoutMs, (page) =>
-    page.evaluate(async (query) => {
-      const win = window as unknown as {
-        v2Fetch?: (request: {
-          url: string;
-          args: Record<string, string>;
-          method: "POST";
-          acsConf: { useAcsToken: true };
-        }) => Promise<unknown>;
-        v2FetchJSON?: (request: {
-          url: string;
-          args: Record<string, string>;
-          method: "POST";
-          acsConf: { useAcsToken: true };
-        }) => Promise<unknown>;
-      };
-      const request = {
-        url: "/transapi",
-        args: {
-          from: "en",
-          to: "zh",
-          query,
-          source: "txt",
-        },
-        method: "POST",
-        acsConf: { useAcsToken: true },
-      } as const;
-
-      if (typeof win.v2Fetch === "function") return win.v2Fetch(request);
-      if (typeof win.v2FetchJSON === "function") {
-        try {
-          return await win.v2FetchJSON(request);
-        } catch (error) {
-          if (error && typeof error === "object" && ("result" in error || "status" in error || "errno" in error)) return error;
-          throw error;
-        }
-      }
-
-      throw new Error("No Baidu token fetch function is available on window.");
-    }, text),
-  );
+  return withBaiduPage(text, timeoutMs, async (page) => {
+    const pageText = await page.locator("body").innerText({ timeout: timeoutMs });
+    logTeacherDebug("provider", "browser-provider:page-text", {
+      text,
+      length: pageText.length,
+      preview: pageText.slice(0, 2000),
+    });
+    return parseBaiduRenderedPageText(pageText, text);
+  });
 }
 
 function summarizeBrowserResponse(response: unknown) {
@@ -167,6 +108,121 @@ function parseJsonObject(value: unknown): Record<string, unknown> | undefined {
   } catch {
     return undefined;
   }
+}
+
+export function parseBaiduRenderedPageText(pageText: string, sourceText: string): BaiduBrowserResponse {
+  const lines = pageText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const dictionaryIndex = findDictionaryTermIndex(lines, sourceText);
+  const reviewExplanation = extractRenderedReviewExplanation(lines, sourceText);
+  const result: Record<string, unknown> = {
+    src: sourceText,
+    content: [],
+  };
+
+  const voice = dictionaryIndex >= 0 ? extractRenderedVoice(lines, dictionaryIndex) : [];
+  if (voice.length) result.voice = voice;
+
+  const meanings = dictionaryIndex >= 0 ? extractRenderedDictionaryMeanings(lines, dictionaryIndex) : [];
+  if (meanings.length) {
+    result.content = [{ mean: meanings }];
+  } else {
+    const translatedMeaning = extractRenderedPrimaryTranslation(lines, sourceText);
+    if (translatedMeaning) {
+      result.content = [{ mean: [{ cont: { [translatedMeaning]: 0 } }] }];
+    }
+  }
+
+  if (reviewExplanation) result.review_explanation = reviewExplanation;
+
+  return {
+    status: 0,
+    result: JSON.stringify(result),
+  };
+}
+
+function findDictionaryTermIndex(lines: string[], sourceText: string) {
+  const normalizedSource = sourceText.trim().toLowerCase();
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].toLowerCase() !== normalizedSource) continue;
+    const nearby = lines.slice(index + 1, index + 8);
+    if (nearby.some((line) => line.startsWith("英/") || line.startsWith("美/") || line === "网络" || isPartOfSpeechLine(line))) return index;
+  }
+  return -1;
+}
+
+function extractRenderedVoice(lines: string[], dictionaryIndex: number) {
+  const voice: Record<string, string>[] = [];
+  const english = lines.slice(dictionaryIndex + 1, dictionaryIndex + 8).find((line) => line.startsWith("英/"));
+  const american = lines.slice(dictionaryIndex + 1, dictionaryIndex + 8).find((line) => line.startsWith("美/"));
+  if (english) voice.push({ en_phonic: english.replace(/^英/, "") });
+  if (american) voice.push({ us_phonic: american.replace(/^美/, "") });
+  return voice;
+}
+
+function extractRenderedDictionaryMeanings(lines: string[], dictionaryIndex: number) {
+  const meanings: { pre?: string; cont: Record<string, number> }[] = [];
+  const windowLines = lines.slice(dictionaryIndex + 1, dictionaryIndex + 80);
+  for (let index = 0; index < windowLines.length; index += 1) {
+    const line = windowLines[index];
+    if (isDictionaryEndLine(line)) break;
+
+    if (isPartOfSpeechLine(line)) {
+      const chineseMeaning = windowLines[index + 1];
+      if (chineseMeaning && !isDictionaryEndLine(chineseMeaning) && !isPartOfSpeechLine(chineseMeaning)) {
+        meanings.push({ pre: line, cont: meaningTextToCont(chineseMeaning) });
+        index += 1;
+      }
+      continue;
+    }
+
+    if (line === "网络") {
+      const chineseMeaning = windowLines[index + 1];
+      if (chineseMeaning && !isDictionaryEndLine(chineseMeaning)) meanings.push({ cont: meaningTextToCont(chineseMeaning) });
+      break;
+    }
+  }
+  return meanings;
+}
+
+function isPartOfSpeechLine(line: string) {
+  return /^(n|v|adj|adv|prep|pron|conj|interj|modal)\.$/i.test(line);
+}
+
+function isDictionaryEndLine(line: string) {
+  return /^(第三人称单数|高考|CET|考研|牛津词典|柯林斯词典|英英释义|例句|词语用例|同反义词|展开|AI论文精翻)$/.test(line);
+}
+
+function meaningTextToCont(text: string) {
+  return Object.fromEntries(text.split(/[；;]/).map((item) => item.trim()).filter(Boolean).map((item) => [item, 0]));
+}
+
+function extractRenderedPrimaryTranslation(lines: string[], sourceText: string) {
+  const aiIndex = lines.findIndex((line) => line === "AI大模型翻译");
+  if (aiIndex < 0) return "";
+  for (const line of lines.slice(aiIndex + 1, aiIndex + 8)) {
+    if (!line || line === sourceText || line === "编辑译文" || line === "段落对照") continue;
+    return line;
+  }
+  return "";
+}
+
+function extractRenderedReviewExplanation(lines: string[], sourceText: string) {
+  const startIndex = lines.findIndex((line) => line === "段落对照");
+  if (startIndex < 0) return buildReviewExplanation(sourceText);
+
+  const explanationLines: string[] = [];
+  for (const line of lines.slice(startIndex + 1)) {
+    if (line === "试一试：" || line === "翻译详解" || line === "关键术语解释" || line === "以上为AI翻译结果") break;
+    if (line === sourceText || line === "编辑译文" || line === "段落对照") continue;
+    explanationLines.push(line);
+  }
+
+  const renderedExplanation = explanationLines.join("\n").trim();
+  const fallbackExplanation = buildReviewExplanation(sourceText);
+  if (renderedExplanation && fallbackExplanation && !renderedExplanation.includes(fallbackExplanation)) {
+    return `${renderedExplanation}\n\n${fallbackExplanation}`;
+  }
+  return renderedExplanation || fallbackExplanation;
 }
 
 function collectChineseMeanings(result: Record<string, unknown> | undefined) {
@@ -220,7 +276,7 @@ function collectStructuredMeanings(result: Record<string, unknown> | undefined):
   const meanings: MeaningDraft[] = [];
   const content = Array.isArray(result?.content) ? result.content : [];
   const sourceText = typeof result?.src === "string" ? result.src : "";
-  const reviewExplanation = buildReviewExplanation(sourceText);
+  const reviewExplanation = collectReviewExplanation(result, sourceText);
 
   for (const contentItem of content) {
     if (!contentItem || typeof contentItem !== "object") continue;
@@ -246,6 +302,11 @@ function collectStructuredMeanings(result: Record<string, unknown> | undefined):
   }
 
   return meanings;
+}
+
+function collectReviewExplanation(result: Record<string, unknown> | undefined, sourceText: string) {
+  const renderedExplanation = typeof result?.review_explanation === "string" ? result.review_explanation.trim() : "";
+  return renderedExplanation || buildReviewExplanation(sourceText);
 }
 
 function collectContMeanings(cont: unknown) {
@@ -295,23 +356,35 @@ function fieldSources(): MeaningDraft["fieldSources"] {
   return { chineseMeaning: "web_lookup" };
 }
 
-function mergeBrowserMeaning(draft: TermDraft, chineseMeaning: string): MeaningDraft[] {
+function fieldSourcesWithExplanation(explanation: string | undefined): MeaningDraft["fieldSources"] {
+  return explanation ? { ...fieldSources(), explanation: "web_lookup" } : fieldSources();
+}
+
+function mergeBrowserMeaning(draft: TermDraft, chineseMeaning: string, explanation?: string): MeaningDraft[] {
   if (!draft.meanings.length) {
-    return [{ chineseMeaning, fieldSources: fieldSources() }];
+    const generatedMeaning: MeaningDraft = {
+      chineseMeaning,
+      fieldSources: fieldSourcesWithExplanation(explanation),
+    };
+    if (explanation) generatedMeaning.explanation = explanation;
+    return [generatedMeaning];
   }
 
   return draft.meanings.map((meaning, index) => {
     if (index > 0 || hasVisibleChineseMeaning(draft.text, meaning)) return meaning;
+    const nextFieldSources: MeaningDraft["fieldSources"] = {
+      ...withoutMockOnlySources(meaning.fieldSources),
+      chineseMeaning: "web_lookup",
+    };
+    if (explanation) nextFieldSources.explanation = "web_lookup";
+
     return {
       ...meaning,
       chineseMeaning,
       exampleSentence: meaning.fieldSources.exampleSentence === "mock_generated" ? undefined : meaning.exampleSentence,
-      explanation: meaning.fieldSources.explanation === "mock_generated" ? undefined : meaning.explanation,
+      explanation: meaning.fieldSources.explanation === "mock_generated" ? explanation : (meaning.explanation ?? explanation),
       usageContext: meaning.fieldSources.usageContext === "mock_generated" ? undefined : meaning.usageContext,
-      fieldSources: {
-        ...withoutMockOnlySources(meaning.fieldSources),
-        chineseMeaning: "web_lookup",
-      },
+      fieldSources: nextFieldSources,
     };
   });
 }
@@ -367,10 +440,12 @@ export function parseBaiduBrowserTranslateResponse(response: unknown, draft: Ter
   const result = parseJsonObject(baiduResponse.result);
   const structuredMeanings = draft.termType === "word" ? collectStructuredMeanings(result) : [];
   const chineseMeaning = structuredMeanings.length ? "" : collectChineseMeanings(result);
+  const reviewExplanation = collectReviewExplanation(result, draft.text);
   logTeacherDebug("provider", "browser-provider:parse:extracted", {
     text: draft.text,
     structuredMeanings,
     chineseMeaning,
+    reviewExplanation,
     phoneticSymbol: collectPhoneticSymbol(result),
   });
   if (!structuredMeanings.length && !chineseMeaning) return draft;
@@ -379,7 +454,7 @@ export function parseBaiduBrowserTranslateResponse(response: unknown, draft: Ter
     ...draft,
     phoneticSymbol: draft.termType === "word" ? choosePhoneticSymbol(draft.text, draft.phoneticSymbol, collectPhoneticSymbol(result)) : undefined,
     pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? buildBaiduTtsUrl(draft.text)) : undefined,
-    meanings: structuredMeanings.length ? structuredMeanings : mergeBrowserMeaning(draft, chineseMeaning),
+    meanings: structuredMeanings.length ? structuredMeanings : mergeBrowserMeaning(draft, chineseMeaning, reviewExplanation),
   };
 }
 
