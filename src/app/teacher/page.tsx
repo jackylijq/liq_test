@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { moveTeacherTermGroupAction, renameTeacherGroupAction } from "./actions";
+import { buildTeacherCategoryOptions } from "@/lib/teacher/category-management";
 import {
   getTeacherContentOutline,
   getTeacherGroups,
@@ -32,6 +34,13 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
   const visibleTerms = terms;
   const contentTitle = selectedCategory?.name ?? selectedUnit?.name ?? selectedGroup?.name ?? "暂无分类";
   const enrichHref = contentGroupId ? `/teacher/enrich?groupId=${contentGroupId}` : "/teacher/enrich";
+  const returnTo = buildTeacherReturnTo({
+    groupId: selectedGroup?.id,
+    unitId: selectedUnit?.id,
+    categoryId: selectedCategory?.id,
+    importBatchId: params.importBatchId,
+  });
+  const categoryOptions = selectedGroup ? buildTeacherCategoryOptions(selectedGroup, outline) : [];
 
   return (
     <main className="teacher-workbench">
@@ -90,25 +99,29 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
           <section className="teacher-outline-panel" aria-label="单元与内容筛选">
             <nav className="teacher-unit-tabs" aria-label="单元筛选">
               {outline.map((unit) => (
-                <Link
-                  className={unit.id === selectedUnit?.id ? "active" : ""}
-                  href={`/teacher?groupId=${selectedGroup.id}&unitId=${unit.id}`}
-                  key={unit.id}
-                >
-                  {unit.name}
-                </Link>
+                <div className="teacher-category-control" key={unit.id}>
+                  <Link
+                    className={unit.id === selectedUnit?.id ? "active" : ""}
+                    href={`/teacher?groupId=${selectedGroup.id}&unitId=${unit.id}`}
+                  >
+                    {unit.name}
+                  </Link>
+                  <RenameGroupForm groupId={unit.id} name={unit.name} returnTo={returnTo} />
+                </div>
               ))}
             </nav>
             {selectedUnit ? (
               <nav className="teacher-filter-tabs" aria-label="内容筛选">
                 {selectedUnit.categories.map((category) => (
-                  <Link
-                    className={category.id === selectedCategory?.id ? "active" : ""}
-                    href={`/teacher?groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
-                    key={category.id}
-                  >
-                    {category.name}
-                  </Link>
+                  <div className="teacher-category-control" key={category.id}>
+                    <Link
+                      className={category.id === selectedCategory?.id ? "active" : ""}
+                      href={`/teacher?groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
+                    >
+                      {category.name}
+                    </Link>
+                    <RenameGroupForm groupId={category.id} name={category.rawName} returnTo={returnTo} />
+                  </div>
                 ))}
               </nav>
             ) : null}
@@ -143,6 +156,15 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
                 {term.meanings.map((meaning, index) =>
                   shouldShowUsageContext(meaning) ? <p key={`${term.id}-usage-${index}`}>{meaning.usageContext}</p> : null,
                 )}
+                {selectedGroup ? (
+                  <MoveTermGroupForm
+                    options={categoryOptions}
+                    returnTo={returnTo}
+                    rootGroupId={selectedGroup.id}
+                    selectedGroupId={getTermSelectedGroupId(term, categoryOptions, selectedGroup.id)}
+                    termId={term.id}
+                  />
+                ) : null}
               </article>
             ))
           )}
@@ -150,4 +172,67 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
       </section>
     </main>
   );
+}
+
+function RenameGroupForm({ groupId, name, returnTo }: { groupId: string; name: string; returnTo: string }) {
+  return (
+    <form action={renameTeacherGroupAction} className="teacher-rename-form">
+      <input name="groupId" type="hidden" value={groupId} />
+      <input name="returnTo" type="hidden" value={returnTo} />
+      <input aria-label="分类名称" name="name" defaultValue={name} />
+      <button type="submit">改名</button>
+    </form>
+  );
+}
+
+function MoveTermGroupForm({
+  options,
+  returnTo,
+  rootGroupId,
+  selectedGroupId,
+  termId,
+}: {
+  options: Array<{ id: string; label: string }>;
+  returnTo: string;
+  rootGroupId: string;
+  selectedGroupId: string;
+  termId: string;
+}) {
+  return (
+    <form action={moveTeacherTermGroupAction} className="teacher-term-category-form">
+      <input name="termId" type="hidden" value={termId} />
+      <input name="rootGroupId" type="hidden" value={rootGroupId} />
+      <input name="returnTo" type="hidden" value={returnTo} />
+      <label>
+        分类
+        <select name="targetGroupId" defaultValue={selectedGroupId}>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="submit">修改分类</button>
+    </form>
+  );
+}
+
+function getTermSelectedGroupId(
+  term: Awaited<ReturnType<typeof getTeacherGroupTerms>>[number],
+  options: Array<{ id: string }>,
+  fallbackGroupId: string,
+) {
+  const linkedGroupIds = new Set(term.groups.map((item) => item.groupId));
+  return [...options].reverse().find((option) => linkedGroupIds.has(option.id))?.id ?? fallbackGroupId;
+}
+
+function buildTeacherReturnTo(params: { groupId?: string; unitId?: string; categoryId?: string; importBatchId?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params.groupId) searchParams.set("groupId", params.groupId);
+  if (params.unitId) searchParams.set("unitId", params.unitId);
+  if (params.categoryId) searchParams.set("categoryId", params.categoryId);
+  if (params.importBatchId) searchParams.set("importBatchId", params.importBatchId);
+  const query = searchParams.toString();
+  return query ? `/teacher?${query}` : "/teacher";
 }

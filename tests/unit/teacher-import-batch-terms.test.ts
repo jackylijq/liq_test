@@ -70,6 +70,9 @@ describe("getTeacherImportBatchTerms", () => {
         meanings: {
           orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }],
         },
+        groups: {
+          include: { group: true },
+        },
       },
     });
     expect(terms.map((term) => term.id)).toEqual(["across-id", "care-id"]);

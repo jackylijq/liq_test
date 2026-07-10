@@ -1,6 +1,6 @@
 "use server";
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { enrichTermDraft } from "@/lib/enrichment/provider";
 import { extractDocxText } from "@/lib/import/parse-docx";
@@ -9,6 +9,7 @@ import { parseImportedText } from "@/lib/import/parse-text";
 import { extractPdfText } from "@/lib/import/parse-pdf";
 import { prisma } from "@/lib/db";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
+import { getTeacherGroupScope, getTeacherGroupScopeIds } from "@/lib/teacher/groups";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
 import { choosePhoneticSymbol } from "@/lib/terms/phonetics";
@@ -159,9 +160,11 @@ async function parseImportFormData(
         fileName.endsWith(".docx") || file.type.includes("wordprocessingml.document")
           ? await extractDocxText(buffer)
           : await extractPdfText(buffer);
+      const rootGroupId = (await getTeacherGroupScope(targetGroupId))?.rootGroupId ?? targetGroupId;
+      const scopeGroupIds = await getTeacherGroupScopeIds(rootGroupId);
       const parsedRows = parseImportedText(extractedText);
       const existingTerms = await prisma.term.findMany({
-        where: { groups: { some: { groupId: targetGroupId } } },
+        where: { groups: { some: { groupId: { in: scopeGroupIds } } } },
         select: { text: true, normalizedText: true, termType: true },
       });
 
@@ -201,7 +204,6 @@ export async function confirmImportAction(formData: FormData) {
   }
 
   const startedAt = Date.now();
-  const groupPathCache = new Map<string, string[]>();
   logTeacherDebug("import", "confirm:start", {
     batchId: batch.id,
     sourceType: batch.sourceType,
@@ -209,6 +211,9 @@ export async function confirmImportAction(formData: FormData) {
   });
 
   await prisma.$transaction(async (tx) => {
+    const rootGroupId = await getRootGroupId(tx, batch.targetGroupId);
+    const rootScopeIds = await getGroupScopeIds(tx, rootGroupId);
+
     for (const row of batch.rows) {
       const draft = JSON.parse(row.enrichedJson) as TermDraft;
       logTeacherDebug("import", "confirm:row", {
@@ -224,26 +229,9 @@ export async function confirmImportAction(formData: FormData) {
         continue;
       }
 
-      const term = await tx.term.upsert({
-        where: {
-          normalizedText_termType: {
-            normalizedText: normalizeTermText(draft.text),
-            termType: draft.termType,
-          },
-        },
-        update: {},
-        create: {
-          text: draft.text,
-          normalizedText: normalizeTermText(draft.text),
-          termType: draft.termType,
-          phoneticSymbol: draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null,
-          pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null,
-          createdSource: "import",
-        },
-        include: { meanings: true },
-      });
+      const { term, matchedInCurrentRoot } = await findOrCreateSourceTerm(tx, draft, rootScopeIds);
 
-      for (const groupId of await resolveDraftGroupIds(tx, batch.targetGroupId, draft, groupPathCache)) {
+      for (const groupId of [rootGroupId]) {
         await tx.termGroup.upsert({
           where: {
             termId_groupId: {
@@ -263,6 +251,7 @@ export async function confirmImportAction(formData: FormData) {
       logTeacherDebug("import", "confirm:saved-term", {
         id: term.id,
         text: term.text,
+        matchedInCurrentRoot,
         meaningCount: draft.meanings.filter(hasMeaningContent).length,
       });
     }
@@ -279,6 +268,79 @@ export async function confirmImportAction(formData: FormData) {
     durationMs: Date.now() - startedAt,
   });
   redirect(`/teacher?groupId=${batch.targetGroupId}&importBatchId=${batch.id}`);
+}
+
+async function getRootGroupId(client: DbClient, groupId: string) {
+  const group = await client.group.findUnique({
+    where: { id: groupId },
+    include: {
+      parent: {
+        include: {
+          parent: true,
+        },
+      },
+    },
+  });
+  return group?.parent?.parent?.id ?? group?.parent?.id ?? group?.id ?? groupId;
+}
+
+async function getGroupScopeIds(client: DbClient, groupId: string) {
+  const groupIds = [groupId];
+  let frontier = [groupId];
+
+  while (frontier.length > 0) {
+    const children = await client.group.findMany({
+      where: { parentId: { in: frontier } },
+      select: { id: true },
+    });
+    frontier = children.map((child) => child.id);
+    groupIds.push(...frontier);
+  }
+
+  return groupIds;
+}
+
+async function findOrCreateSourceTerm(client: DbClient, draft: TermDraft, scopeGroupIds: string[]) {
+  const normalizedText = normalizeTermText(draft.text);
+  const scopedTerm = await client.term.findFirst({
+    where: {
+      normalizedText,
+      termType: draft.termType,
+      groups: { some: { groupId: { in: scopeGroupIds } } },
+    },
+    include: { meanings: true },
+  });
+  if (scopedTerm) return { term: scopedTerm, matchedInCurrentRoot: true };
+
+  try {
+    const term = await client.term.create({
+      data: {
+        text: draft.text,
+        normalizedText,
+        termType: draft.termType,
+        phoneticSymbol: draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null,
+        pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null,
+        createdSource: "import",
+      },
+      include: { meanings: true },
+    });
+    return { term, matchedInCurrentRoot: false };
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      throw error;
+    }
+    const term = await client.term.findUnique({
+      where: {
+        normalizedText_termType: {
+          normalizedText,
+          termType: draft.termType,
+        },
+      },
+      include: { meanings: true },
+    });
+    if (!term) throw error;
+    return { term, matchedInCurrentRoot: false };
+  }
 }
 
 function debugTermDraft(row: TermDraft) {
@@ -370,45 +432,4 @@ function hasMeaningContent(meaning: MeaningDraft) {
       meaning.explanation?.trim() ||
       meaning.usageContext?.trim(),
   );
-}
-
-async function resolveDraftGroupIds(client: DbClient, targetGroupId: string, draft: TermDraft, cache = new Map<string, string[]>()) {
-  const cacheKey = `${targetGroupId}:${(draft.categoryPath ?? []).join("/")}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
-
-  const groupIds = [targetGroupId];
-  let parentId = targetGroupId;
-
-  for (const [index, rawName] of (draft.categoryPath ?? []).entries()) {
-    const name = rawName.trim();
-    if (!name) continue;
-
-    const group = await findOrCreateChildGroup(client, name, parentId, index + 1);
-    groupIds.push(group.id);
-    parentId = group.id;
-  }
-
-  const resolved = [...new Set(groupIds)];
-  cache.set(cacheKey, resolved);
-  return resolved;
-}
-
-async function findOrCreateChildGroup(client: DbClient, name: string, parentId: string, sortOrder: number) {
-  const existing = await client.group.findFirst({ where: { name, parentId } });
-  if (existing) return existing;
-
-  try {
-    return await client.group.create({
-      data: {
-        name,
-        parentId,
-        sortOrder,
-      },
-    });
-  } catch (error) {
-    const concurrent = await client.group.findFirst({ where: { name, parentId } });
-    if (concurrent) return concurrent;
-    throw error;
-  }
 }
