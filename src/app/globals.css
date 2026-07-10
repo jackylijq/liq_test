@@ -165,7 +165,9 @@ select {
   border-radius: 8px;
   padding: 18px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+  align-items: start;
 }
 
 .study-card h2,
@@ -189,13 +191,6 @@ select {
 .study-card audio {
   width: 132px;
   height: 30px;
-}
-
-.study-card-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: start;
 }
 
 .study-card-main {
@@ -226,6 +221,7 @@ select {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
 }
 
@@ -233,22 +229,38 @@ select {
   margin: 0;
 }
 
-.study-card button,
-.study-toggle {
+.study-card button {
   border: 1px solid #d7dce5;
   border-radius: 8px;
   background: #fff;
-  padding: 10px 12px;
-  text-align: left;
+  padding: 0;
+  text-align: center;
 }
 
-.study-status-button {
+.study-icon-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
   cursor: pointer;
-  font-weight: 700;
-  white-space: nowrap;
+  color: #475569;
+}
+
+.study-icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.study-toggle-button.active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .study-status-button.mastered.active {
@@ -261,41 +273,6 @@ select {
   border-color: #f97316;
   background: #fff7ed;
   color: #c2410c;
-}
-
-.study-details {
-  display: grid;
-  justify-items: end;
-  gap: 10px;
-}
-
-.study-toggle {
-  display: inline-flex;
-  cursor: pointer;
-  font-weight: 700;
-  color: #1d4ed8;
-  list-style: none;
-}
-
-.study-toggle::-webkit-details-marker {
-  display: none;
-}
-
-.study-details[open] .study-toggle {
-  background: #eff6ff;
-  border-color: #93c5fd;
-}
-
-.study-toggle-close {
-  display: none;
-}
-
-.study-details[open] .study-toggle-open {
-  display: none;
-}
-
-.study-details[open] .study-toggle-close {
-  display: inline;
 }
 
 .study-detail-body {
@@ -617,7 +594,7 @@ select {
     padding: 14px;
   }
 
-  .study-card-header {
+  .study-card {
     grid-template-columns: 1fr;
   }
 
@@ -625,9 +602,9 @@ select {
     justify-content: flex-start;
   }
 
-  .study-status-button,
-  .study-toggle {
-    padding: 9px 10px;
+  .study-icon-button {
+    width: 36px;
+    height: 36px;
   }
 
   .bottom-nav {

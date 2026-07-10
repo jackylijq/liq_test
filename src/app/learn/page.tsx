@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { updateLearningProgressAction } from "./actions";
+import { LearnTermCard } from "./LearnTermCard";
 import { prisma } from "@/lib/db";
 import { DEFAULT_STUDENT_USER_KEY, type LearningStatus } from "@/lib/learning/progress";
 import {
@@ -87,59 +87,19 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
               const meaning = term.meanings[0];
               const learningStatus = progressByTermId.get(term.id);
               return (
-                <article className="study-card" key={term.id}>
-                  <div className="study-card-header">
-                    <div className="study-card-main">
-                      <h2>
-                        <span>{term.text}</span>
-                        {term.termType === "word" && term.phoneticSymbol ? <small>{term.phoneticSymbol}</small> : null}
-                      </h2>
-                      <p>{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
-                      {learningStatus ? <p className={`study-status-label ${learningStatus}`}>{formatLearningStatus(learningStatus)}</p> : null}
-                      {term.termType === "word" ? (
-                        <audio aria-label={`${term.text} 发音`} controls preload="none" src={buildPronunciationAudioUrl(term.text)} />
-                      ) : null}
-                    </div>
-                    <div className="study-card-actions">
-                      <LearningStatusForm
-                        activeStatus={learningStatus}
-                        categoryId={params.categoryId}
-                        groupId={params.groupId}
-                        status="mastered"
-                        termId={term.id}
-                        unitId={params.unitId}
-                      />
-                      <LearningStatusForm
-                        activeStatus={learningStatus}
-                        categoryId={params.categoryId}
-                        groupId={params.groupId}
-                        status="unmastered"
-                        termId={term.id}
-                        unitId={params.unitId}
-                      />
-                    </div>
-                  </div>
-                  <details className="study-details">
-                    <summary className="study-toggle">
-                      <span className="study-toggle-open">展开</span>
-                      <span className="study-toggle-close">收起</span>
-                    </summary>
-                    <div className="study-detail-body">
-                      {getMeaningLines(term.termType, term.meanings, term.text).map((line, index) => (
-                        <p key={`${term.id}-meaning-${index}`}>{line}</p>
-                      ))}
-                      {getVisibleExampleSentences(term.termType, term.text, term.meanings).map((sentence, index) => (
-                        <p key={`${term.id}-example-${index}`}>{sentence}</p>
-                      ))}
-                      {getVisibleExplanationLines(term.meanings).map((explanation, index) => (
-                        <p key={`${term.id}-explanation-${index}`}>{explanation}</p>
-                      ))}
-                      {term.meanings.map((item, index) =>
-                        shouldShowUsageContext(item) ? <p key={`${term.id}-usage-${index}`}>{item.usageContext}</p> : null,
-                      )}
-                    </div>
-                  </details>
-                </article>
+                <LearnTermCard
+                  activeStatus={learningStatus}
+                  audioUrl={term.termType === "word" ? buildPronunciationAudioUrl(term.text) : undefined}
+                  categoryId={params.categoryId}
+                  detailLines={getStudyDetailLines(term)}
+                  groupId={params.groupId}
+                  key={term.id}
+                  phoneticSymbol={term.termType === "word" ? term.phoneticSymbol : null}
+                  termId={term.id}
+                  termText={term.text}
+                  termTypeLabel={formatStudyType(term.termType, meaning?.partOfSpeech)}
+                  unitId={params.unitId}
+                />
               );
             })}
           </section>
@@ -166,37 +126,11 @@ function formatStudyType(termType: string, partOfSpeech?: string | null) {
   return `${partOfSpeech ?? "word"} · 🔊`;
 }
 
-function formatLearningStatus(status: LearningStatus) {
-  return status === "mastered" ? "已掌握" : "未掌握";
-}
-
-function LearningStatusForm({
-  activeStatus,
-  categoryId,
-  groupId,
-  status,
-  termId,
-  unitId,
-}: {
-  activeStatus?: LearningStatus;
-  categoryId?: string;
-  groupId?: string;
-  status: LearningStatus;
-  termId: string;
-  unitId?: string;
-}) {
-  const isActive = activeStatus === status;
-  return (
-    <form action={updateLearningProgressAction} className="study-status-form">
-      <input name="termId" type="hidden" value={termId} />
-      <input name="status" type="hidden" value={status} />
-      {groupId ? <input name="groupId" type="hidden" value={groupId} /> : null}
-      {unitId ? <input name="unitId" type="hidden" value={unitId} /> : null}
-      {categoryId ? <input name="categoryId" type="hidden" value={categoryId} /> : null}
-      <button className={`study-status-button ${status} ${isActive ? "active" : ""}`} type="submit" aria-pressed={isActive}>
-        <span aria-hidden="true">{status === "mastered" ? "✓" : "!"}</span>
-        {status === "mastered" ? "掌握" : "未掌握"}
-      </button>
-    </form>
-  );
+function getStudyDetailLines(term: Awaited<ReturnType<typeof getTeacherGroupTerms>>[number]) {
+  return [
+    ...getMeaningLines(term.termType, term.meanings, term.text),
+    ...getVisibleExampleSentences(term.termType, term.text, term.meanings),
+    ...getVisibleExplanationLines(term.meanings),
+    ...term.meanings.flatMap((item) => (shouldShowUsageContext(item) && item.usageContext ? [item.usageContext] : [])),
+  ];
 }
