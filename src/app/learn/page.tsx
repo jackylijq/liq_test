@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LearnTermCard } from "./LearnTermCard";
+import { updateLearningProgressAction } from "./actions";
 import { prisma } from "@/lib/db";
 import { DEFAULT_STUDENT_USER_KEY, type LearningStatus } from "@/lib/learning/progress";
 import {
@@ -86,20 +86,52 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
             {terms.map((term) => {
               const meaning = term.meanings[0];
               const learningStatus = progressByTermId.get(term.id);
+              const detailLines = getStudyDetailLines(term);
               return (
-                <LearnTermCard
-                  activeStatus={learningStatus}
-                  audioUrl={term.termType === "word" ? buildPronunciationAudioUrl(term.text) : undefined}
-                  categoryId={params.categoryId}
-                  detailLines={getStudyDetailLines(term)}
-                  groupId={params.groupId}
-                  key={term.id}
-                  phoneticSymbol={term.termType === "word" ? term.phoneticSymbol : null}
-                  termId={term.id}
-                  termText={term.text}
-                  termTypeLabel={formatStudyType(term.termType, meaning?.partOfSpeech)}
-                  unitId={params.unitId}
-                />
+                <article className="study-card" key={term.id}>
+                  <div className="study-card-main">
+                    <h2>
+                      <span>{term.text}</span>
+                      {term.termType === "word" && term.phoneticSymbol ? <small>{term.phoneticSymbol}</small> : null}
+                    </h2>
+                    <p>{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
+                    {learningStatus ? <p className={`study-status-label ${learningStatus}`}>{formatLearningStatus(learningStatus)}</p> : null}
+                    {term.termType === "word" ? (
+                      <audio aria-label={`${term.text} 发音`} controls preload="none" src={buildPronunciationAudioUrl(term.text)} />
+                    ) : null}
+                  </div>
+                  <details className="study-details">
+                    <summary className="study-icon-button study-toggle-button" title="展开/收起内容" aria-label="展开/收起内容">
+                      <span className="study-toggle-open">
+                        <EyeIcon />
+                      </span>
+                      <span className="study-toggle-close">
+                        <EyeOffIcon />
+                      </span>
+                    </summary>
+                    <div className="study-detail-body">
+                      {detailLines.map((line, index) => (
+                        <p key={`${term.id}-detail-${index}`}>{line}</p>
+                      ))}
+                    </div>
+                  </details>
+                  <LearningStatusForm
+                    activeStatus={learningStatus}
+                    categoryId={params.categoryId}
+                    groupId={params.groupId}
+                    status="mastered"
+                    termId={term.id}
+                    unitId={params.unitId}
+                  />
+                  <LearningStatusForm
+                    activeStatus={learningStatus}
+                    categoryId={params.categoryId}
+                    groupId={params.groupId}
+                    status="unmastered"
+                    termId={term.id}
+                    unitId={params.unitId}
+                  />
+                </article>
               );
             })}
           </section>
@@ -126,6 +158,10 @@ function formatStudyType(termType: string, partOfSpeech?: string | null) {
   return `${partOfSpeech ?? "word"} · 🔊`;
 }
 
+function formatLearningStatus(status: LearningStatus) {
+  return status === "mastered" ? "已掌握" : "未掌握";
+}
+
 function getStudyDetailLines(term: Awaited<ReturnType<typeof getTeacherGroupTerms>>[number]) {
   return [
     ...getMeaningLines(term.termType, term.meanings, term.text),
@@ -133,4 +169,77 @@ function getStudyDetailLines(term: Awaited<ReturnType<typeof getTeacherGroupTerm
     ...getVisibleExplanationLines(term.meanings),
     ...term.meanings.flatMap((item) => (shouldShowUsageContext(item) && item.usageContext ? [item.usageContext] : [])),
   ];
+}
+
+function LearningStatusForm({
+  activeStatus,
+  categoryId,
+  groupId,
+  status,
+  termId,
+  unitId,
+}: {
+  activeStatus?: LearningStatus;
+  categoryId?: string;
+  groupId?: string;
+  status: LearningStatus;
+  termId: string;
+  unitId?: string;
+}) {
+  const isActive = activeStatus === status;
+  return (
+    <form action={updateLearningProgressAction} className={`study-status-form ${status}`}>
+      <input name="termId" type="hidden" value={termId} />
+      <input name="status" type="hidden" value={status} />
+      {groupId ? <input name="groupId" type="hidden" value={groupId} /> : null}
+      {unitId ? <input name="unitId" type="hidden" value={unitId} /> : null}
+      {categoryId ? <input name="categoryId" type="hidden" value={categoryId} /> : null}
+      <button
+        aria-label={status === "mastered" ? "标记为掌握" : "标记为未掌握"}
+        aria-pressed={isActive}
+        className={`study-icon-button study-status-button ${status} ${isActive ? "active" : ""}`}
+        title={status === "mastered" ? "掌握" : "未掌握"}
+        type="submit"
+      >
+        {status === "mastered" ? <CheckIcon /> : <XIcon />}
+      </button>
+    </form>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="m3 3 18 18" />
+      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+      <path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a15.6 15.6 0 0 1-3.1 4.1" />
+      <path d="M6.6 6.6A15.2 15.2 0 0 0 2 12s3.5 7 10 7a10.8 10.8 0 0 0 4.5-.9" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="m5 12 4 4L19 6" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
 }
