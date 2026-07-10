@@ -100,6 +100,38 @@ describe("parseBaiduRenderedPageText", () => {
 
     expect(parsed.meanings[0].chineseMeaning).toBe("");
   });
+
+  it("keeps all rendered dialogue translation lines before edit marker", () => {
+    const response = parseBaiduRenderedPageText(
+      [
+        "AI大模型翻译",
+        "——你为什么不喜欢蛇？",
+        "——因为它们真的很可怕。",
+        "编辑译文",
+        "段落对照",
+        "试一试：",
+      ].join("\n"),
+      "—Why don't you like snakes? —Because they are really scary.",
+    );
+
+    const parsed = parseBaiduBrowserTranslateResponse(response, {
+      text: "—Why don't you like snakes? —Because they are really scary.",
+      termType: "sentence",
+      meanings: [
+        {
+          chineseMeaning: "",
+          exampleSentence: "—Why don't you like snakes? —Because they are really scary.",
+          fieldSources: { exampleSentence: "parsed" },
+        },
+      ],
+    });
+
+    expect(parsed.meanings[0]).toMatchObject({
+      chineseMeaning: "——你为什么不喜欢蛇？ ——因为它们真的很可怕。",
+      exampleSentence: "—Why don't you like snakes? —Because they are really scary.",
+      fieldSources: { chineseMeaning: "web_lookup", exampleSentence: "parsed" },
+    });
+  });
 });
 
 describe("parseBaiduBrowserTranslateResponse", () => {

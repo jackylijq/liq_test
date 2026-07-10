@@ -227,11 +227,11 @@ function extractRenderedPrimaryTranslation(lines: string[], sourceText: string) 
   if (aiIndex < 0) return "";
   const editIndex = lines.findIndex((line, index) => index > aiIndex && line === "编辑译文");
   if (editIndex < 0) return "";
-  for (const line of lines.slice(aiIndex + 1, editIndex)) {
-    if (!line || line === sourceText || line === "编辑译文" || line === "段落对照") continue;
-    return line;
-  }
-  return "";
+  return lines
+    .slice(aiIndex + 1, editIndex)
+    .filter((line) => line && line !== sourceText && line !== "编辑译文" && line !== "段落对照")
+    .join(" ")
+    .trim();
 }
 
 function extractRenderedReviewExplanation(lines: string[], sourceText: string) {
