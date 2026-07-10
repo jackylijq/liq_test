@@ -63,7 +63,6 @@ async function withBaiduPage<T>(text: string, timeoutMs: number, callback: (page
         pageTextLength: pageText.length,
         pageTextPreview: pageText.slice(0, 2000),
       });
-      throw error;
     }
     return await callback(page);
   } finally {
@@ -76,7 +75,19 @@ async function waitForBaiduRenderedTranslation(page: Page, text: string, timeout
   await page.waitForFunction(
     (query) => {
       const bodyText = document.body?.innerText ?? "";
-      return bodyText.includes(query) && (bodyText.includes("简明释义") || bodyText.includes("网络") || /英\/[^\n]+/.test(bodyText));
+      if (!bodyText.includes(query)) return false;
+      if (bodyText.includes("简明释义") || bodyText.includes("网络") || /英\/[^\n]+/.test(bodyText)) return true;
+
+      const lines = bodyText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const aiIndex = lines.findIndex((line) => line === "AI大模型翻译");
+      if (aiIndex < 0) return false;
+      const editIndex = lines.findIndex((line, index) => index > aiIndex && line === "编辑译文");
+      if (editIndex < 0) return false;
+
+      return lines.slice(aiIndex + 1, editIndex).some((line) => {
+        if (!line || line === query || line === "编辑译文" || line === "段落对照") return false;
+        return /[\u4e00-\u9fff]/.test(line);
+      });
     },
     text,
     { timeout: timeoutMs },
@@ -214,7 +225,9 @@ function meaningTextToCont(text: string) {
 function extractRenderedPrimaryTranslation(lines: string[], sourceText: string) {
   const aiIndex = lines.findIndex((line) => line === "AI大模型翻译");
   if (aiIndex < 0) return "";
-  for (const line of lines.slice(aiIndex + 1, aiIndex + 8)) {
+  const editIndex = lines.findIndex((line, index) => index > aiIndex && line === "编辑译文");
+  if (editIndex < 0) return "";
+  for (const line of lines.slice(aiIndex + 1, editIndex)) {
     if (!line || line === sourceText || line === "编辑译文" || line === "段落对照") continue;
     return line;
   }

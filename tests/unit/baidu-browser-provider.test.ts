@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   baiduBrowserTranslateTerm,
   buildBaiduTranslatePageUrl,
@@ -78,6 +78,27 @@ describe("parseBaiduRenderedPageText", () => {
       explanation: expect.stringContaining("通常表示遍及全国"),
       fieldSources: { chineseMeaning: "web_lookup", explanation: "web_lookup" },
     });
+  });
+
+  it("does not treat product promotion text as a primary translation", () => {
+    const response = parseBaiduRenderedPageText(
+      [
+        "AI大模型翻译",
+        "AI论文精翻",
+        "像读中文论文一样",
+        "读英文论文",
+        "AI译后编辑",
+      ].join("\n"),
+      "—Where are they from? —It says Antarctica.",
+    );
+
+    const parsed = parseBaiduBrowserTranslateResponse(response, {
+      text: "—Where are they from? —It says Antarctica.",
+      termType: "sentence",
+      meanings: [{ chineseMeaning: "", fieldSources: {} }],
+    });
+
+    expect(parsed.meanings[0].chineseMeaning).toBe("");
   });
 });
 
@@ -227,6 +248,11 @@ describe("parseBaiduBrowserTranslateResponse", () => {
 });
 
 describe("baiduBrowserTranslateTerm", () => {
+  afterEach(() => {
+    vi.doUnmock("playwright");
+    vi.resetModules();
+  });
+
   it("uses the browser-session translator and parses the result", async () => {
     const translateInBrowser = vi.fn(async () => ({
       status: 0,
@@ -242,5 +268,72 @@ describe("baiduBrowserTranslateTerm", () => {
 
     expect(translateInBrowser).toHaveBeenCalledWith("Across the country");
     expect(translated.meanings[0].chineseMeaning).toBe("全国各地");
+  });
+
+  it("uses rendered page text when Baidu wait condition times out after translation appears", async () => {
+    vi.resetModules();
+    const pageText = [
+      "文本翻译",
+      "英语",
+      "中文(简体)",
+      "—Where are they from? —It says Antarctica.",
+      "参考知识",
+      "AI翻译",
+      "AI大模型翻译",
+      "——他们来自哪里？——上面写着南极洲。",
+      "编辑译文",
+      "段落对照",
+      "试一试：",
+      "翻译详解",
+    ].join("\n");
+    const bodyLocator = {
+      innerText: vi.fn(async () => pageText),
+    };
+    const page = {
+      setDefaultTimeout: vi.fn(),
+      goto: vi.fn(async () => undefined),
+      url: vi.fn(() => "https://fanyi.baidu.com/mtpe-individual/transText"),
+      title: vi.fn(async () => "百度翻译"),
+      waitForFunction: vi.fn(async () => {
+        throw new Error("Timeout 30000ms exceeded.");
+      }),
+      locator: vi.fn(() => bodyLocator),
+      close: vi.fn(async () => undefined),
+    };
+    const context = {
+      newPage: vi.fn(async () => page),
+      close: vi.fn(async () => undefined),
+    };
+    const browser = {
+      newContext: vi.fn(async () => context),
+    };
+    vi.doMock("playwright", () => ({
+      chromium: {
+        launch: vi.fn(async () => browser),
+      },
+    }));
+    const { baiduBrowserTranslateTerm: translateWithBrowser } = await import("@/lib/enrichment/baidu-browser-provider");
+
+    const translated = await translateWithBrowser(
+      {
+        text: "—Where are they from? —It says Antarctica.",
+        termType: "sentence",
+        meanings: [
+          {
+            chineseMeaning: "",
+            exampleSentence: "—Where are they from? —It says Antarctica.",
+            fieldSources: { exampleSentence: "parsed" },
+          },
+        ],
+      },
+      { timeoutMs: 1 },
+    );
+
+    expect(page.waitForFunction).toHaveBeenCalledOnce();
+    expect(translated.meanings[0]).toMatchObject({
+      chineseMeaning: "——他们来自哪里？——上面写着南极洲。",
+      exampleSentence: "—Where are they from? —It says Antarctica.",
+      fieldSources: { chineseMeaning: "web_lookup", exampleSentence: "parsed" },
+    });
   });
 });
