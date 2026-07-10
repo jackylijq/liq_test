@@ -14,6 +14,10 @@ type BaiduBrowserResponse = {
   result?: string | Record<string, unknown>;
 };
 
+type BaiduBrowserFunctionName = "v2Fetch" | "v2FetchJSON";
+
+const browserFetchFunctionNames: BaiduBrowserFunctionName[] = ["v2Fetch", "v2FetchJSON"];
+
 let browserPromise: Promise<Browser> | undefined;
 
 function getTimeout(options: BaiduBrowserTranslateOptions) {
@@ -50,28 +54,65 @@ async function withBaiduPage<T>(timeoutMs: number, callback: (page: Page) => Pro
       url: page.url(),
       title: await page.title().catch(() => ""),
     });
-    await page.waitForFunction(() => typeof window !== "undefined" && typeof (window as unknown as { v2Fetch?: unknown }).v2Fetch === "function", {
-      timeout: timeoutMs,
-    });
-    logTeacherDebug("provider", "browser-provider:v2fetch:ready", {});
+    try {
+      await waitForBaiduTokenFetch(page, timeoutMs);
+      logTeacherDebug("provider", "browser-provider:token-fetch:ready", {
+        functions: await getAvailableBaiduFetchFunctions(page),
+      });
+    } catch (error) {
+      logTeacherDebug("provider", "browser-provider:token-fetch:timeout", {
+        error: error instanceof Error ? { name: error.name, message: error.message } : error,
+        functions: await getAvailableBaiduFetchFunctions(page),
+      });
+      throw error;
+    }
     return await callback(page);
   } finally {
     await page.close().catch(() => undefined);
   }
 }
 
+async function waitForBaiduTokenFetch(page: Page, timeoutMs: number) {
+  await page.waitForFunction(
+    (functionNames) =>
+      typeof window !== "undefined" &&
+      functionNames.some((name) => typeof (window as unknown as Record<string, unknown>)[name] === "function"),
+    browserFetchFunctionNames,
+    { timeout: timeoutMs },
+  );
+}
+
+async function getAvailableBaiduFetchFunctions(page: Page) {
+  return page
+    .evaluate((functionNames) => {
+      const win = window as unknown as Record<string, unknown>;
+      const expected = functionNames.filter((name) => typeof win[name] === "function");
+      const related = Object.keys(win)
+        .filter((key) => /fetch|acs|token|trans/i.test(key))
+        .sort();
+      return { expected, related };
+    }, browserFetchFunctionNames)
+    .catch(() => ({ expected: [], related: [] }));
+}
+
 async function translateWithBaiduBrowser(text: string, timeoutMs: number) {
   return withBaiduPage(timeoutMs, (page) =>
     page.evaluate(async (query) => {
       const win = window as unknown as {
-        v2Fetch: (request: {
+        v2Fetch?: (request: {
+          url: string;
+          args: Record<string, string>;
+          method: "POST";
+          acsConf: { useAcsToken: true };
+        }) => Promise<unknown>;
+        v2FetchJSON?: (request: {
           url: string;
           args: Record<string, string>;
           method: "POST";
           acsConf: { useAcsToken: true };
         }) => Promise<unknown>;
       };
-      return win.v2Fetch({
+      const request = {
         url: "/transapi",
         args: {
           from: "en",
@@ -81,7 +122,19 @@ async function translateWithBaiduBrowser(text: string, timeoutMs: number) {
         },
         method: "POST",
         acsConf: { useAcsToken: true },
-      });
+      } as const;
+
+      if (typeof win.v2Fetch === "function") return win.v2Fetch(request);
+      if (typeof win.v2FetchJSON === "function") {
+        try {
+          return await win.v2FetchJSON(request);
+        } catch (error) {
+          if (error && typeof error === "object" && ("result" in error || "status" in error || "errno" in error)) return error;
+          throw error;
+        }
+      }
+
+      throw new Error("No Baidu token fetch function is available on window.");
     }, text),
   );
 }
