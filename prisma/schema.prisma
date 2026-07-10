@@ -33,8 +33,9 @@ model Term {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  groups   TermGroup[]
-  meanings TermMeaning[]
+  groups           TermGroup[]
+  meanings         TermMeaning[]
+  learningProgress LearningProgress[]
 
   @@unique([normalizedText, termType])
 }
@@ -62,6 +63,20 @@ model TermMeaning {
   updatedAt        DateTime @updatedAt
 
   term Term @relation(fields: [termId], references: [id], onDelete: Cascade)
+}
+
+model LearningProgress {
+  id        String   @id @default(cuid())
+  userKey   String
+  termId    String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  term Term @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@unique([userKey, termId])
+  @@index([userKey, status])
 }
 
 model ImportBatch {

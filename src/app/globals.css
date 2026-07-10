@@ -191,12 +191,120 @@ select {
   height: 30px;
 }
 
-.study-card button {
+.study-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.study-card-main {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.study-status-label {
+  width: max-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.study-status-label.mastered {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.study-status-label.unmastered {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.study-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.study-status-form {
+  margin: 0;
+}
+
+.study-card button,
+.study-toggle {
   border: 1px solid #d7dce5;
   border-radius: 8px;
   background: #fff;
   padding: 10px 12px;
   text-align: left;
+}
+
+.study-status-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.study-status-button.mastered.active {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.study-status-button.unmastered.active {
+  border-color: #f97316;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.study-details {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.study-toggle {
+  display: inline-flex;
+  cursor: pointer;
+  font-weight: 700;
+  color: #1d4ed8;
+  list-style: none;
+}
+
+.study-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.study-details[open] .study-toggle {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.study-toggle-close {
+  display: none;
+}
+
+.study-details[open] .study-toggle-open {
+  display: none;
+}
+
+.study-details[open] .study-toggle-close {
+  display: inline;
+}
+
+.study-detail-body {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #eef2f7;
+  padding-top: 10px;
+  justify-self: stretch;
 }
 
 .bottom-nav {
@@ -503,6 +611,23 @@ select {
   .learn-scroll .student-content {
     overflow: auto;
     align-content: start;
+  }
+
+  .study-card {
+    padding: 14px;
+  }
+
+  .study-card-header {
+    grid-template-columns: 1fr;
+  }
+
+  .study-card-actions {
+    justify-content: flex-start;
+  }
+
+  .study-status-button,
+  .study-toggle {
+    padding: 9px 10px;
   }
 
   .bottom-nav {
