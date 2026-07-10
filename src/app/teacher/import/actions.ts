@@ -1,5 +1,6 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { enrichTermDraft } from "@/lib/enrichment/provider";
 import { extractDocxText } from "@/lib/import/parse-docx";
@@ -10,6 +11,11 @@ import { prisma } from "@/lib/db";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
+
+type DbClient = typeof prisma | Prisma.TransactionClient;
+
+const importEnrichConcurrency = Number(process.env.TEACHER_IMPORT_ENRICH_CONCURRENCY ?? 4);
+const browserImportBatchLimit = Number(process.env.BAIDU_BROWSER_IMPORT_BATCH_LIMIT ?? 2);
 
 export async function parseImportAction(formData: FormData) {
   const content = String(formData.get("content") ?? "");
@@ -33,23 +39,22 @@ export async function parseImportAction(formData: FormData) {
     redirect(`/teacher?groupId=${targetGroup.id}&error=empty-import`);
   }
 
+  const browserUsagePlan = parsedImport.mode === "source" ? buildBrowserUsagePlan(parsed) : [];
   const enriched =
     parsedImport.mode === "source"
-      ? await Promise.all(
-          parsed.map(async (row) => {
-            const useBrowser = shouldUseBrowserForSourceImport(row, { rowCount: parsed.length });
-            logTeacherDebug("import", "enrich:before", {
-              useBrowser,
-              row: debugTermDraft(row),
-            });
-            const enrichedRow = await enrichTermDraft(row, { useBrowser });
-            logTeacherDebug("import", "enrich:after", {
-              useBrowser,
-              row: debugTermDraft(enrichedRow),
-            });
-            return enrichedRow;
-          }),
-        )
+      ? await mapWithConcurrency(parsed, importEnrichConcurrency, async (row, index) => {
+          const useBrowser = browserUsagePlan[index] ?? false;
+          logTeacherDebug("import", "enrich:before", {
+            useBrowser,
+            row: debugTermDraft(row),
+          });
+          const enrichedRow = await enrichTermDraft(row, { useBrowser });
+          logTeacherDebug("import", "enrich:after", {
+            useBrowser,
+            row: debugTermDraft(enrichedRow),
+          });
+          return enrichedRow;
+        })
       : parsed;
   const batch = await prisma.importBatch.create({
     data: {
@@ -75,6 +80,35 @@ export async function parseImportAction(formData: FormData) {
     enrichedRows: enriched.map(debugTermDraft),
   });
   redirect(`/teacher/import/${batch.id}/preview`);
+}
+
+function buildBrowserUsagePlan(rows: TermDraft[]) {
+  let usedBrowserRows = 0;
+  const maxBrowserRows = rows.length === 1 ? 1 : Math.max(0, browserImportBatchLimit);
+
+  return rows.map((row) => {
+    const requested = shouldUseBrowserForSourceImport(row, { rowCount: rows.length });
+    if (!requested || usedBrowserRows >= maxBrowserRows) return false;
+    usedBrowserRows += 1;
+    return true;
+  });
+}
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T, index: number) => Promise<R>) {
+  const limit = Math.max(1, concurrency);
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
 }
 
 function getImportFileName(formData: FormData) {
@@ -165,81 +199,83 @@ export async function confirmImportAction(formData: FormData) {
     redirect("/teacher/library");
   }
 
-  for (const row of batch.rows) {
-    const draft = JSON.parse(row.enrichedJson) as TermDraft;
-    logTeacherDebug("import", "confirm:row", {
-      batchId: batch.id,
-      sourceType: batch.sourceType,
-      draft: debugTermDraft(draft),
-    });
-    if (batch.sourceType === "supplement") {
-      await applySupplementDraft(draft);
-      continue;
-    }
+  const startedAt = Date.now();
+  const groupPathCache = new Map<string, string[]>();
+  logTeacherDebug("import", "confirm:start", {
+    batchId: batch.id,
+    sourceType: batch.sourceType,
+    rowCount: batch.rows.length,
+  });
 
-    const term = await prisma.term.upsert({
-      where: {
-        normalizedText_termType: {
-          normalizedText: normalizeTermText(draft.text),
-          termType: draft.termType,
-        },
-      },
-      update: {},
-      create: {
+  await prisma.$transaction(async (tx) => {
+    for (const row of batch.rows) {
+      const draft = JSON.parse(row.enrichedJson) as TermDraft;
+      logTeacherDebug("import", "confirm:row", {
+        batchId: batch.id,
+        sourceType: batch.sourceType,
         text: draft.text,
-        normalizedText: normalizeTermText(draft.text),
         termType: draft.termType,
-        phoneticSymbol: draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null,
-        pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null,
-        createdSource: "import",
-      },
-      include: { meanings: true },
-    });
+        meaningCount: draft.meanings.length,
+        categoryPath: draft.categoryPath,
+      });
+      if (batch.sourceType === "supplement") {
+        await applySupplementDraft(tx, draft);
+        continue;
+      }
 
-    for (const groupId of await resolveDraftGroupIds(batch.targetGroupId, draft)) {
-      await prisma.termGroup.upsert({
+      const term = await tx.term.upsert({
         where: {
-          termId_groupId: {
-            termId: term.id,
-            groupId,
+          normalizedText_termType: {
+            normalizedText: normalizeTermText(draft.text),
+            termType: draft.termType,
           },
         },
         update: {},
         create: {
-          termId: term.id,
-          groupId,
+          text: draft.text,
+          normalizedText: normalizeTermText(draft.text),
+          termType: draft.termType,
+          phoneticSymbol: draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null,
+          pronunciationUrl: draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null,
+          createdSource: "import",
         },
+        include: { meanings: true },
+      });
+
+      for (const groupId of await resolveDraftGroupIds(tx, batch.targetGroupId, draft, groupPathCache)) {
+        await tx.termGroup.upsert({
+          where: {
+            termId_groupId: {
+              termId: term.id,
+              groupId,
+            },
+          },
+          update: {},
+          create: {
+            termId: term.id,
+            groupId,
+          },
+        });
+      }
+
+      await saveDraftMeanings(tx, term.id, draft, term.meanings);
+      logTeacherDebug("import", "confirm:saved-term", {
+        id: term.id,
+        text: term.text,
+        meaningCount: draft.meanings.filter(hasMeaningContent).length,
       });
     }
 
-    await saveDraftMeanings(term.id, draft, term.meanings);
-    const savedTerm = await prisma.term.findUnique({
-      where: { id: term.id },
-      include: { meanings: { orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }] } },
+    await tx.importBatch.update({
+      where: { id: batch.id },
+      data: { status: "confirmed", confirmedAt: new Date() },
     });
-    logTeacherDebug("import", "confirm:saved-term", {
-      term: savedTerm
-        ? {
-            id: savedTerm.id,
-            text: savedTerm.text,
-            phoneticSymbol: savedTerm.phoneticSymbol,
-            pronunciationUrl: savedTerm.pronunciationUrl,
-            meanings: savedTerm.meanings.map((meaning) => ({
-              partOfSpeech: meaning.partOfSpeech,
-              chineseMeaning: meaning.chineseMeaning,
-              exampleSentence: meaning.exampleSentence,
-              explanation: meaning.explanation,
-              usageContext: meaning.usageContext,
-              fieldSourcesJson: meaning.fieldSourcesJson,
-            })),
-          }
-        : null,
-    });
-  }
+  });
 
-  await prisma.importBatch.update({
-    where: { id: batch.id },
-    data: { status: "confirmed", confirmedAt: new Date() },
+  logTeacherDebug("import", "confirm:done", {
+    batchId: batch.id,
+    rowCount: batch.rows.length,
+    durationMs: Date.now() - startedAt,
   });
   redirect(`/teacher?groupId=${batch.targetGroupId}`);
 }
@@ -262,8 +298,8 @@ function debugTermDraft(row: TermDraft) {
   };
 }
 
-async function applySupplementDraft(draft: TermDraft) {
-  const term = await prisma.term.findUnique({
+async function applySupplementDraft(client: DbClient, draft: TermDraft) {
+  const term = await client.term.findUnique({
     where: {
       normalizedText_termType: {
         normalizedText: normalizeTermText(draft.text),
@@ -274,17 +310,18 @@ async function applySupplementDraft(draft: TermDraft) {
   });
   if (!term) return;
 
-  await prisma.term.update({
+  await client.term.update({
     where: { id: term.id },
     data: {
       phoneticSymbol: term.phoneticSymbol ?? (draft.termType === "word" ? (draft.phoneticSymbol ?? null) : null),
       pronunciationUrl: term.pronunciationUrl ?? (draft.termType === "word" ? (draft.pronunciationUrl ?? null) : null),
     },
   });
-  await saveDraftMeanings(term.id, draft, term.meanings);
+  await saveDraftMeanings(client, term.id, draft, term.meanings);
 }
 
 async function saveDraftMeanings(
+  client: DbClient,
   termId: string,
   draft: TermDraft,
   existingMeanings: {
@@ -300,7 +337,7 @@ async function saveDraftMeanings(
 
     const existing = existingMeanings.find((saved) => saved.chineseMeaning.trim() === meaning.chineseMeaning.trim());
     if (existing) {
-      await prisma.termMeaning.update({
+      await client.termMeaning.update({
         where: { id: existing.id },
         data: {
           exampleSentence: existing.exampleSentence ?? meaning.exampleSentence ?? null,
@@ -311,7 +348,7 @@ async function saveDraftMeanings(
       continue;
     }
 
-    await prisma.termMeaning.create({
+    await client.termMeaning.create({
       data: {
         termId,
         partOfSpeech: draft.termType === "phrase" ? null : (meaning.partOfSpeech ?? null),
@@ -334,7 +371,11 @@ function hasMeaningContent(meaning: MeaningDraft) {
   );
 }
 
-async function resolveDraftGroupIds(targetGroupId: string, draft: TermDraft) {
+async function resolveDraftGroupIds(client: DbClient, targetGroupId: string, draft: TermDraft, cache = new Map<string, string[]>()) {
+  const cacheKey = `${targetGroupId}:${(draft.categoryPath ?? []).join("/")}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
   const groupIds = [targetGroupId];
   let parentId = targetGroupId;
 
@@ -342,20 +383,22 @@ async function resolveDraftGroupIds(targetGroupId: string, draft: TermDraft) {
     const name = rawName.trim();
     if (!name) continue;
 
-    const group = await findOrCreateChildGroup(name, parentId, index + 1);
+    const group = await findOrCreateChildGroup(client, name, parentId, index + 1);
     groupIds.push(group.id);
     parentId = group.id;
   }
 
-  return [...new Set(groupIds)];
+  const resolved = [...new Set(groupIds)];
+  cache.set(cacheKey, resolved);
+  return resolved;
 }
 
-async function findOrCreateChildGroup(name: string, parentId: string, sortOrder: number) {
-  const existing = await prisma.group.findFirst({ where: { name, parentId } });
+async function findOrCreateChildGroup(client: DbClient, name: string, parentId: string, sortOrder: number) {
+  const existing = await client.group.findFirst({ where: { name, parentId } });
   if (existing) return existing;
 
   try {
-    return await prisma.group.create({
+    return await client.group.create({
       data: {
         name,
         parentId,
@@ -363,7 +406,7 @@ async function findOrCreateChildGroup(name: string, parentId: string, sortOrder:
       },
     });
   } catch (error) {
-    const concurrent = await prisma.group.findFirst({ where: { name, parentId } });
+    const concurrent = await client.group.findFirst({ where: { name, parentId } });
     if (concurrent) return concurrent;
     throw error;
   }

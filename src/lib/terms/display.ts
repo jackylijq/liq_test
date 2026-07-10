@@ -107,3 +107,33 @@ export function getVisibleExplanations(meanings: DisplayMeaning[]) {
     .filter((explanation): explanation is string => Boolean(explanation));
   return [...new Set(explanations)];
 }
+
+export function formatExplanationLines(explanation: string) {
+  const normalized = explanation
+    .trim()
+    .replace(/\r\n?/g, "\n")
+    .replace(/\s*(表示情感关注时，如)/g, "\n$1")
+    .replace(/\s*(表示照料时，如)/g, "\n$1")
+    .replace(/\s*(表示谨慎时，如)/g, "\n$1")
+    .replace(/\s*(表示在意某事时，如)/g, "\n$1")
+    .replace(/\s*(此外，)/g, "\n$1")
+    .replace(/\s*(关心（最常见译法）)/g, "\n$1")
+    .replace(/\s*(照顾\/照料（侧重具体行为）)/g, "\n$1")
+    .replace(/\s*(在意\/介意（含情感倾向）)/g, "\n$1")
+    .replace(/\s*(谨慎\/小心（名词用法）)/g, "\n$1")
+    .replace(/\s*(忧虑（古语用法）)/g, "\n$1")
+    .replace(/\s*(特殊搭配：)/g, "\n$1")
+    .replace(/\s*("health care"\s*→)/g, "\n$1")
+    .replace(/\s*("take care"\s*→)/g, "\n$1")
+    .replace(/\s*("child care"\s*→)/g, "\n$1")
+    .replace(/\s*(注意：)/g, "\n$1")
+    .replace(/\s*(例：)/g, "\n$1")
+    .replace(/\n{3,}/g, "\n\n");
+
+  return normalized.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+}
+
+export function getVisibleExplanationLines(meanings: DisplayMeaning[]) {
+  const lines = getVisibleExplanations(meanings).flatMap(formatExplanationLines);
+  return [...new Set(lines)];
+}

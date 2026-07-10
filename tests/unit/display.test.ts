@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   formatChineseMeaningLine,
+  formatExplanationLines,
   getVisibleExampleSentences,
+  getVisibleExplanationLines,
   getVisibleExplanations,
   formatPartOfSpeech,
   getMeaningLines,
@@ -76,6 +78,33 @@ describe("term display formatting", () => {
     expect(getVisibleExampleSentences("word", "care", meanings)).toEqual(["She shows great care for her students."]);
     expect(shouldShowExplanation(meanings[0])).toBe(false);
     expect(getVisibleExplanations(meanings)).toEqual(["用于表示关心或照顾。"]);
+  });
+
+  it("formats long explanations into semantic lines", () => {
+    const explanation =
+      "“care”这个词在中文里可以有多种译法，具体取决于语境。常见的翻译包括“关心”、“照顾”、“在意”、“小心”等。例如： 表示情感关注时，如“I care about you.”可译为“我关心你。” 表示照料时，如“She takes care of children.”可译为“她照顾孩子。” 特殊搭配： \"health care\" → 医疗/保健 \"take care\" → 保重/当心 注意：动词形态常译为\"在乎/关心\"。";
+
+    expect(formatExplanationLines(explanation)).toEqual([
+      "“care”这个词在中文里可以有多种译法，具体取决于语境。常见的翻译包括“关心”、“照顾”、“在意”、“小心”等。例如：",
+      "表示情感关注时，如“I care about you.”可译为“我关心你。”",
+      "表示照料时，如“She takes care of children.”可译为“她照顾孩子。”",
+      "特殊搭配：",
+      "\"health care\" → 医疗/保健",
+      "\"take care\" → 保重/当心",
+      "注意：动词形态常译为\"在乎/关心\"。",
+    ]);
+  });
+
+  it("returns visible explanation lines", () => {
+    expect(
+      getVisibleExplanationLines([
+        {
+          chineseMeaning: "照顾",
+          explanation: "关心（最常见译法） 例：She shows great care for her students.（她非常关心学生）",
+          fieldSourcesJson: '{"explanation":"web_lookup"}',
+        },
+      ]),
+    ).toEqual(["关心（最常见译法）", "例：She shows great care for her students.（她非常关心学生）"]);
   });
 
   it("hides mock-generated examples from old enrichment results", () => {
