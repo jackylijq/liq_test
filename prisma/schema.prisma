@@ -133,6 +133,39 @@ model ImportRow {
   batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 }
 
+model TeacherEnrichJob {
+  id             String    @id @default(cuid())
+  targetGroupId  String
+  status         String
+  totalCount     Int
+  completedCount Int       @default(0)
+  failedCount    Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  completedAt    DateTime?
+
+  items TeacherEnrichJobItem[]
+
+  @@index([targetGroupId])
+  @@index([status])
+}
+
+model TeacherEnrichJobItem {
+  id          String    @id @default(cuid())
+  jobId       String
+  termId      String
+  termText    String
+  status      String
+  error       String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  job TeacherEnrichJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([termId])
+}
+
 model ExamSession {
   id                   String   @id @default(cuid())
   selectedGroupIdsJson String

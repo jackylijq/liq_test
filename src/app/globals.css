@@ -698,6 +698,50 @@ select {
   gap: 8px;
 }
 
+.enrich-running-hint {
+  margin: 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.teacher-enrich-toasts {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  width: min(340px, calc(100vw - 36px));
+}
+
+.teacher-enrich-toast {
+  border: 1px solid #d7dce5;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.teacher-enrich-toast.info {
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.teacher-enrich-toast.success {
+  border-color: #bbf7d0;
+  color: #047857;
+}
+
+.teacher-enrich-toast.error {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
 .enrich-row {
   display: grid;
   grid-template-columns: 20px 1fr;
@@ -773,6 +817,146 @@ select {
 
 .teacher-term-card p {
   margin: 8px 0 0;
+}
+
+.teacher-term-card-header {
+  position: relative;
+  padding-right: 44px;
+}
+
+.teacher-term-edit-button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7dce5;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.teacher-term-edit-button svg,
+.teacher-term-edit-header button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.teacher-term-edit-dialog {
+  width: min(820px, calc(100vw - 28px));
+  max-height: min(820px, calc(100dvh - 28px));
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.teacher-term-edit-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.teacher-term-edit-form {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.teacher-term-edit-header,
+.teacher-term-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacher-term-edit-header h2,
+.teacher-term-edit-header p {
+  margin: 0;
+}
+
+.teacher-term-edit-header button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d7dce5;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+}
+
+.teacher-term-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.teacher-term-edit-wide {
+  grid-column: 1 / -1;
+}
+
+.teacher-term-edit-grid label,
+.teacher-term-edit-meanings label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-weight: 700;
+}
+
+.teacher-term-edit-grid input,
+.teacher-term-edit-grid select,
+.teacher-term-edit-meanings input,
+.teacher-term-edit-meanings textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cfd5df;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #1f2937;
+}
+
+.teacher-term-edit-meanings {
+  display: grid;
+  gap: 12px;
+}
+
+.teacher-term-edit-meanings fieldset {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+.teacher-term-edit-meanings legend {
+  padding: 0 6px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.teacher-term-edit-actions {
+  justify-content: flex-end;
+}
+
+.teacher-term-edit-actions button {
+  border: 1px solid #cfd5df;
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 14px;
+  font-weight: 700;
+}
+
+.teacher-term-edit-actions button[type="submit"] {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
 }
 
 .category-maintenance-panel {

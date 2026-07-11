@@ -1,12 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { enrichTermDraft } from "@/lib/enrichment/provider";
 import { prisma } from "@/lib/db";
 import type { MeaningDraft, TermDraft, TermType } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
 import { choosePhoneticSymbol } from "@/lib/terms/phonetics";
-import { getTeacherGroupScope, getTeacherGroupScopeIds, sortTeacherTermsForEnrichment } from "@/lib/teacher/groups";
+import { buildTeacherEnrichJobHref } from "@/lib/teacher/enrich-jobs";
+import { getTeacherGroupScopeIds, sortTeacherTermsForEnrichment } from "@/lib/teacher/groups";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
 
 type DbTerm = Awaited<ReturnType<typeof getTermsForEnrichment>>[number];
@@ -29,44 +31,109 @@ export async function enrichTeacherTermsAction(formData: FormData) {
     count: terms.length,
     terms: terms.map(debugDbTerm),
   });
-  for (const term of terms) {
-    const draft = dbTermToDraft(term);
-    logTeacherDebug("enrich", "term:before", {
-      term: debugDbTerm(term),
-      draft: debugTermDraft(draft),
+
+  const job = await prisma.teacherEnrichJob.create({
+    data: {
+      targetGroupId,
+      status: "pending",
+      totalCount: terms.length,
+      items: {
+        create: terms.map((term) => ({
+          termId: term.id,
+          termText: term.text,
+          status: "pending",
+        })),
+      },
+    },
+  });
+
+  processTeacherEnrichJob(job.id).catch((error) => {
+    logTeacherDebug("enrich", "job:unhandled-error", {
+      jobId: job.id,
+      error: error instanceof Error ? error.message : String(error),
     });
-    const enriched = await enrichTermDraft(draft, { useBrowser: true });
-    logTeacherDebug("enrich", "term:after-enrich", {
-      termId: term.id,
-      enriched: debugTermDraft(enriched),
+  });
+
+  redirect(buildTeacherEnrichJobHref({ groupId: targetGroupId, jobId: job.id }));
+}
+
+async function processTeacherEnrichJob(jobId: string) {
+  await prisma.teacherEnrichJob.update({
+    where: { id: jobId },
+    data: { status: "running" },
+  });
+
+  const items = await prisma.teacherEnrichJobItem.findMany({
+    where: { jobId },
+    orderBy: { createdAt: "asc" },
+  });
+  let completedCount = 0;
+  let failedCount = 0;
+
+  for (const item of items) {
+    await prisma.teacherEnrichJobItem.update({
+      where: { id: item.id },
+      data: { status: "running", error: null },
     });
-    await saveEnrichedTerm(term, enriched);
-    const savedTerm = await prisma.term.findUnique({
-      where: { id: term.id },
-      include: { meanings: { orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }] } },
-    });
-    logTeacherDebug("enrich", "term:after-save", {
-      term: savedTerm
-        ? {
-            id: savedTerm.id,
-            text: savedTerm.text,
-            phoneticSymbol: savedTerm.phoneticSymbol,
-            pronunciationUrl: savedTerm.pronunciationUrl,
-            meanings: savedTerm.meanings.map((meaning) => ({
-              partOfSpeech: meaning.partOfSpeech,
-              chineseMeaning: meaning.chineseMeaning,
-              exampleSentence: meaning.exampleSentence,
-              explanation: meaning.explanation,
-              usageContext: meaning.usageContext,
-              fieldSourcesJson: meaning.fieldSourcesJson,
-            })),
-          }
-        : null,
+
+    try {
+      const term = await prisma.term.findUnique({
+        where: { id: item.termId },
+        include: { meanings: true },
+      });
+      if (!term) throw new Error("词条不存在");
+
+      const draft = dbTermToDraft(term);
+      logTeacherDebug("enrich", "term:before", {
+        jobId,
+        term: debugDbTerm(term),
+        draft: debugTermDraft(draft),
+      });
+      const enriched = await enrichTermDraft(draft, { useBrowser: true });
+      logTeacherDebug("enrich", "term:after-enrich", {
+        jobId,
+        termId: term.id,
+        enriched: debugTermDraft(enriched),
+      });
+      await saveEnrichedTerm(term, enriched);
+      revalidatePath("/teacher");
+      completedCount += 1;
+      await prisma.teacherEnrichJobItem.update({
+        where: { id: item.id },
+        data: { status: "completed", completedAt: new Date(), error: null },
+      });
+    } catch (error) {
+      failedCount += 1;
+      await prisma.teacherEnrichJobItem.update({
+        where: { id: item.id },
+        data: {
+          status: "failed",
+          completedAt: new Date(),
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+
+    await prisma.teacherEnrichJob.update({
+      where: { id: jobId },
+      data: {
+        status: "running",
+        completedCount,
+        failedCount,
+      },
     });
   }
 
-  const scope = await getTeacherGroupScope(targetGroupId);
-  redirect(scope?.teacherHref ?? `/teacher?menu=materials&groupId=${targetGroupId}`);
+  await prisma.teacherEnrichJob.update({
+    where: { id: jobId },
+    data: {
+      status: failedCount > 0 ? "failed" : "completed",
+      completedCount,
+      failedCount,
+      completedAt: new Date(),
+    },
+  });
+  revalidatePath("/teacher");
 }
 
 function debugDbTerm(term: DbTerm) {

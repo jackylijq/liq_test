@@ -111,6 +111,9 @@ export async function getTeacherGroupTerms(groupId: string) {
   return prisma.term.findMany({
     where: { groups: { some: { groupId: { in: groupIds } } } },
     include: {
+      groups: {
+        select: { groupId: true },
+      },
       meanings: {
         orderBy: [{ partOfSpeech: "asc" }, { createdAt: "asc" }],
       },

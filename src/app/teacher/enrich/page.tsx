@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { enrichTeacherTermsAction } from "./actions";
+import { TeacherEnrichJobToasts } from "./TeacherEnrichJobToasts";
 import {
   getTeacherGroups,
   getTeacherGroupScope,
@@ -10,7 +11,7 @@ import {
 import { getMeaningLines } from "@/lib/terms/display";
 
 type TeacherEnrichPageProps = {
-  searchParams: Promise<{ groupId?: string; error?: string }>;
+  searchParams: Promise<{ groupId?: string; error?: string; jobId?: string; started?: string }>;
 };
 
 export default async function TeacherEnrichPage({ searchParams }: TeacherEnrichPageProps) {
@@ -23,6 +24,7 @@ export default async function TeacherEnrichPage({ searchParams }: TeacherEnrichP
 
   return (
     <main className="page">
+      <TeacherEnrichJobToasts jobId={params.jobId} />
       <section className="panel teacher-enrich-panel">
         <div className="import-page-header">
           <div>
@@ -33,6 +35,7 @@ export default async function TeacherEnrichPage({ searchParams }: TeacherEnrichP
         </div>
 
         {params.error === "empty-selection" ? <p className="form-error">请至少勾选一条需要补齐的内容。</p> : null}
+        {params.started === "1" ? <p className="enrich-running-hint">正在补齐中，可以停留在当前页面查看提示。</p> : null}
 
         {selectedScope ? (
           <form action={enrichTeacherTermsAction} className="enrich-form">

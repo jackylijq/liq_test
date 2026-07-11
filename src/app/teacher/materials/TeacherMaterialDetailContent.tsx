@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TeacherTermEditDialog } from "./TeacherTermEditDialog";
 import {
   getTeacherContentOutline,
   getTeacherGroupTerms,
@@ -6,6 +7,7 @@ import {
   selectTeacherGroup,
   summarizeTeacherTerms,
 } from "@/lib/teacher/groups";
+import { buildTeacherTermEditReturnHref } from "@/lib/teacher/term-edit";
 import { getMeaningLines, getVisibleExampleSentences, getVisibleExplanationLines, shouldShowUsageContext } from "@/lib/terms/display";
 import { buildPronunciationAudioUrl } from "@/lib/terms/pronunciation";
 
@@ -28,6 +30,8 @@ export async function TeacherMaterialDetailContent({ groupId, unitId, categoryId
   const summary = summarizeTeacherTerms(terms);
   const contentTitle = selectedCategory?.name ?? selectedUnit?.name ?? selectedGroup?.name ?? "暂无分类";
   const enrichHref = contentGroupId ? `/teacher/enrich?groupId=${contentGroupId}` : "/teacher/enrich";
+  const categoryOptions = selectedGroup ? buildTeacherCategoryOptions(selectedGroup.id, selectedGroup.name, outline) : [];
+  const returnHref = buildTeacherTermEditReturnHref({ groupId: selectedGroup?.id, unitId, categoryId });
 
   return (
     <>
@@ -105,7 +109,7 @@ export async function TeacherMaterialDetailContent({ groupId, unitId, categoryId
         ) : (
           terms.map((term) => (
             <article className="teacher-term-card" key={term.id}>
-              <div>
+              <div className="teacher-term-card-header">
                 <strong>{term.text}</strong>
                 {term.termType === "word" && term.phoneticSymbol ? <span>{term.phoneticSymbol}</span> : null}
                 {term.termType === "word" ? (
@@ -114,6 +118,14 @@ export async function TeacherMaterialDetailContent({ groupId, unitId, categoryId
                 {term.termType === "word" ? <span>{term.meanings[0]?.partOfSpeech}</span> : null}
                 {term.termType === "phrase" ? <span>短语</span> : null}
                 {term.termType === "sentence" ? <span>句子</span> : null}
+                {selectedGroup ? (
+                  <TeacherTermEditDialog
+                    categoryOptions={categoryOptions}
+                    returnHref={returnHref}
+                    rootGroupId={selectedGroup.id}
+                    term={term}
+                  />
+                ) : null}
               </div>
               {getMeaningLines(term.termType, term.meanings, term.text).map((line, index) => (
                 <p key={`${term.id}-meaning-${index}`}>{line}</p>
@@ -133,4 +145,21 @@ export async function TeacherMaterialDetailContent({ groupId, unitId, categoryId
       </section>
     </>
   );
+}
+
+function buildTeacherCategoryOptions(
+  rootGroupId: string,
+  rootGroupName: string,
+  outline: Awaited<ReturnType<typeof getTeacherContentOutline>>,
+) {
+  return [
+    { id: rootGroupId, label: rootGroupName },
+    ...outline.flatMap((unit) => [
+      { id: unit.id, label: unit.name },
+      ...unit.categories.map((category) => ({
+        id: category.id,
+        label: `${unit.name} / ${category.name}`,
+      })),
+    ]),
+  ];
 }
