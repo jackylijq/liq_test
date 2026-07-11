@@ -9,6 +9,7 @@ import { parseImportedText } from "@/lib/import/parse-text";
 import { extractPdfText } from "@/lib/import/parse-pdf";
 import { prisma } from "@/lib/db";
 import { logTeacherDebug } from "@/lib/debug/teacher-debug";
+import { resolveImportCategoryGroupId } from "@/lib/teacher/group-import-aliases";
 import { getTeacherGroupScope, getTeacherGroupScopeIds } from "@/lib/teacher/groups";
 import type { MeaningDraft, TermDraft } from "@/lib/types";
 import { normalizeTermText } from "@/lib/terms/normalize";
@@ -229,28 +230,28 @@ export async function confirmImportAction(formData: FormData) {
         continue;
       }
 
+      const contentGroupId = await resolveImportCategoryGroupId(tx, rootGroupId, draft.categoryPath);
       const { term, matchedInCurrentRoot } = await findOrCreateSourceTerm(tx, draft, rootScopeIds);
 
-      for (const groupId of [rootGroupId]) {
-        await tx.termGroup.upsert({
-          where: {
-            termId_groupId: {
-              termId: term.id,
-              groupId,
-            },
-          },
-          update: {},
-          create: {
+      await tx.termGroup.upsert({
+        where: {
+          termId_groupId: {
             termId: term.id,
-            groupId,
+            groupId: contentGroupId,
           },
-        });
-      }
+        },
+        update: {},
+        create: {
+          termId: term.id,
+          groupId: contentGroupId,
+        },
+      });
 
       await saveDraftMeanings(tx, term.id, draft, term.meanings);
       logTeacherDebug("import", "confirm:saved-term", {
         id: term.id,
         text: term.text,
+        groupId: contentGroupId,
         matchedInCurrentRoot,
         meaningCount: draft.meanings.filter(hasMeaningContent).length,
       });

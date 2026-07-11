@@ -19,8 +19,23 @@ model Group {
   children  Group[]     @relation("GroupHierarchy")
   termLinks TermGroup[]
   materialFavorites TeacherMaterialFavorite[]
+  importAliases GroupImportAlias[]
 
   @@unique([name, parentId])
+}
+
+model GroupImportAlias {
+  id         String   @id @default(cuid())
+  groupId    String
+  sourceType String
+  sourceKey  String
+  sourceName String
+  createdAt  DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceType, sourceKey])
+  @@index([groupId])
 }
 
 model Term {

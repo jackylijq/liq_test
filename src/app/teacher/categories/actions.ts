@@ -9,6 +9,7 @@ import {
   normalizeCategoryName,
 } from "@/lib/teacher/category-maintenance";
 import { prisma } from "@/lib/db";
+import { createRenameImportAliasForGroup } from "@/lib/teacher/group-import-aliases";
 
 export async function createCategoryAction(formData: FormData) {
   const name = normalizeCategoryName(formData.get("name"));
@@ -49,9 +50,12 @@ export async function renameCategoryAction(formData: FormData) {
   if (!name) redirect(buildCategoryMaintenanceHref({ expandedRootId, error: "empty-name" }));
 
   try {
-    await prisma.group.update({
-      where: { id },
-      data: { name },
+    await prisma.$transaction(async (tx) => {
+      await createRenameImportAliasForGroup(tx, id);
+      await tx.group.update({
+        where: { id },
+        data: { name },
+      });
     });
   } catch (error) {
     if (isDuplicateCategoryError(error)) {
