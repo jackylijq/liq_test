@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { normalizeTermText } from "@/lib/terms/normalize";
+import { isPlaceholderExampleSentence } from "@/lib/terms/display";
 import { normalizeEditableTermType } from "@/lib/teacher/term-edit";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
@@ -48,7 +49,8 @@ async function saveEditedMeanings(client: DbClient, termId: string, termType: st
   for (const [index, meaningId] of meaningIds.entries()) {
     const partOfSpeech = String(formData.get(`meaning-${index}-partOfSpeech`) ?? "").trim();
     const chineseMeaning = String(formData.get(`meaning-${index}-chineseMeaning`) ?? "").trim();
-    const exampleSentence = String(formData.get(`meaning-${index}-exampleSentence`) ?? "").trim();
+    const rawExampleSentence = String(formData.get(`meaning-${index}-exampleSentence`) ?? "").trim();
+    const exampleSentence = rawExampleSentence && !isPlaceholderExampleSentence(rawExampleSentence) ? rawExampleSentence : "";
     const explanation = String(formData.get(`meaning-${index}-explanation`) ?? "").trim();
     const usageContext = String(formData.get(`meaning-${index}-usageContext`) ?? "").trim();
     const hasContent = Boolean(chineseMeaning || exampleSentence || explanation || usageContext || partOfSpeech);

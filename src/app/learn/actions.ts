@@ -14,6 +14,7 @@ export async function updateLearningProgressAction(formData: FormData) {
     groupId: stringValue(formData.get("groupId")),
     unitId: stringValue(formData.get("unitId")),
     categoryId: stringValue(formData.get("categoryId")),
+    progressStatus: stringValue(formData.get("progressStatus")),
   });
 
   await prisma.learningProgress.upsert({
@@ -33,6 +34,14 @@ export async function updateLearningProgressAction(formData: FormData) {
 
   revalidatePath("/learn");
   redirect(returnHref);
+}
+
+export async function clearLearningProgressAction() {
+  await prisma.learningProgress.deleteMany({
+    where: { userKey: DEFAULT_STUDENT_USER_KEY },
+  });
+  revalidatePath("/learn");
+  redirect("/learn?menu=word-learning");
 }
 
 function stringValue(value: FormDataEntryValue | null) {

@@ -66,6 +66,7 @@ export async function getTeacherMaterialCards(userKey = DEFAULT_TEACHER_USER_KEY
         ...group,
         ...getTeacherMaterialCover(group.name),
         isFavorite: favoriteIds.has(group.id),
+        terms,
         summary,
       };
     }),

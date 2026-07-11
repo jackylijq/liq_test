@@ -122,4 +122,16 @@ describe("term display formatting", () => {
       ]),
     ).toEqual([]);
   });
+
+  it("hides placeholder simple-sentence prompts even if they were saved as edited text", () => {
+    expect(
+      getVisibleExampleSentences("phrase", "Chinese food/Western food", [
+        {
+          chineseMeaning: "中餐/西餐",
+          exampleSentence: 'Please use "Chinese food/Western food" in a simple sentence.',
+          fieldSourcesJson: '{"exampleSentence":"edited"}',
+        },
+      ]),
+    ).toEqual([]);
+  });
 });

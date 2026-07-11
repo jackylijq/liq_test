@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLearningReturnHref, normalizeLearningStatus } from "@/lib/learning/progress";
+import { buildLearningReturnHref, normalizeLearningStatus, summarizeLearningProgress } from "@/lib/learning/progress";
 
 describe("normalizeLearningStatus", () => {
   it("accepts supported learning statuses", () => {
@@ -19,11 +19,27 @@ describe("buildLearningReturnHref", () => {
         groupId: "grade-7",
         unitId: "unit-1",
         categoryId: "section-a",
+        progressStatus: "mastered",
       }),
-    ).toBe("/learn?groupId=grade-7&unitId=unit-1&categoryId=section-a");
+    ).toBe("/learn?menu=word-learning&groupId=grade-7&unitId=unit-1&categoryId=section-a&progressStatus=mastered");
   });
 
   it("falls back to the learning page when no filters are selected", () => {
-    expect(buildLearningReturnHref({})).toBe("/learn");
+    expect(buildLearningReturnHref({})).toBe("/learn?menu=word-learning");
+  });
+});
+
+describe("summarizeLearningProgress", () => {
+  it("counts mastered, unmastered, and unlearned terms", () => {
+    expect(
+      summarizeLearningProgress({
+        totalCount: 5,
+        statuses: ["mastered", "unmastered", "mastered"],
+      }),
+    ).toEqual({
+      masteredCount: 2,
+      unmasteredCount: 1,
+      unlearnedCount: 2,
+    });
   });
 });

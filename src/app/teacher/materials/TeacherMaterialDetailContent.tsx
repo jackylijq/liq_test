@@ -57,13 +57,6 @@ export async function TeacherMaterialDetailContent({ groupId, unitId, categoryId
         </div>
       </header>
 
-      <section className="teacher-material-detail-stats" aria-label="资料统计">
-        <span>单词 {summary.wordCount}</span>
-        <span>短语 {summary.phraseCount}</span>
-        <span>句子 {summary.sentenceCount}</span>
-        <span>待补全 {summary.missingFieldCount}</span>
-      </section>
-
       {error === "empty-import" ? <p className="form-error">请先上传文件或填写导入内容。</p> : null}
       {importBatchId && selectedGroup ? (
         <section className="import-success-panel">
@@ -76,17 +69,25 @@ export async function TeacherMaterialDetailContent({ groupId, unitId, categoryId
 
       {selectedGroup && outline.length > 0 ? (
         <section className="teacher-outline-panel" aria-label="单元与内容筛选">
-          <nav className="teacher-unit-tabs" aria-label="单元筛选">
-            {outline.map((unit) => (
-              <Link
-                className={unit.id === selectedUnit?.id ? "active" : ""}
-                href={`/teacher?menu=materials&groupId=${selectedGroup.id}&unitId=${unit.id}`}
-                key={unit.id}
-              >
-                {unit.name}
-              </Link>
-            ))}
-          </nav>
+          <div className="teacher-outline-summary-row">
+            <nav className="teacher-unit-tabs" aria-label="单元筛选">
+              {outline.map((unit) => (
+                <Link
+                  className={unit.id === selectedUnit?.id ? "active" : ""}
+                  href={`/teacher?menu=materials&groupId=${selectedGroup.id}&unitId=${unit.id}`}
+                  key={unit.id}
+                >
+                  {unit.name}
+                </Link>
+              ))}
+            </nav>
+            <div className="teacher-material-detail-stats" aria-label="资料统计">
+              <span>单词 {summary.wordCount}</span>
+              <span>短语 {summary.phraseCount}</span>
+              <span>句子 {summary.sentenceCount}</span>
+              <span>待补全 {summary.missingFieldCount}</span>
+            </div>
+          </div>
           {selectedUnit ? (
             <nav className="teacher-filter-tabs" aria-label="内容筛选">
               {selectedUnit.categories.map((category) => (

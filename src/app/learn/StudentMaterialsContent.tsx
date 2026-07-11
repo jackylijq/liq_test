@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { clearLearningProgressAction } from "./actions";
+import { prisma } from "@/lib/db";
+import { DEFAULT_STUDENT_USER_KEY, summarizeLearningProgress } from "@/lib/learning/progress";
 import { buildStudentMaterialHref } from "@/lib/student/navigation";
 import {
   filterTeacherMaterialGroups,
@@ -23,6 +26,11 @@ export async function StudentMaterialsContent({ tab }: StudentMaterialsContentPr
   const activeTab = normalizeTeacherMaterialTab(tab);
   const cards = await getTeacherMaterialCards();
   const visibleCards = filterTeacherMaterialGroups(cards, activeTab);
+  const progressRows = await prisma.learningProgress.findMany({
+    where: { userKey: DEFAULT_STUDENT_USER_KEY },
+    select: { termId: true, status: true },
+  });
+  const progressByTermId = new Map(progressRows.map((row) => [row.termId, row.status]));
 
   return (
     <>
@@ -31,6 +39,11 @@ export async function StudentMaterialsContent({ tab }: StudentMaterialsContentPr
           <p className="eyebrow">学生入口</p>
           <h1>单词学习</h1>
         </div>
+        <form action={clearLearningProgressAction}>
+          <button className="secondary-link" type="submit">
+            清空
+          </button>
+        </form>
       </header>
 
       <nav className="teacher-material-tabs" aria-label="单词学习资料分类">
@@ -43,23 +56,32 @@ export async function StudentMaterialsContent({ tab }: StudentMaterialsContentPr
 
       {visibleCards.length > 0 ? (
         <section className="teacher-material-grid">
-          {visibleCards.map((card) => (
-            <article className="teacher-material-card" key={card.id}>
-              <Link className="teacher-material-cover-link" href={buildStudentMaterialHref({ groupId: card.id })}>
-                <img alt={`${card.name} ${card.label}`} src={card.imageUrl} />
-              </Link>
-              <div className="teacher-material-card-body">
-                <strong>{card.name}</strong>
-                <span>{card.label}</span>
-                <div className="teacher-material-card-stats">
-                  <span>单词 {card.summary.wordCount}</span>
-                  <span>短语 {card.summary.phraseCount}</span>
-                  <span>句子 {card.summary.sentenceCount}</span>
-                  <span>待补全 {card.summary.missingFieldCount}</span>
+          {visibleCards.map((card) => {
+            const progress = summarizeLearningProgress({
+              totalCount: card.terms.length,
+              statuses: card.terms.map((term) => progressByTermId.get(term.id)),
+            });
+            return (
+              <article className="teacher-material-card" key={card.id}>
+                <Link className="teacher-material-cover-link" href={buildStudentMaterialHref({ groupId: card.id })}>
+                  <img alt={`${card.name} ${card.label}`} src={card.imageUrl} />
+                </Link>
+                <div className="teacher-material-card-body">
+                  <strong>{card.name}</strong>
+                  <span>{card.label}</span>
+                  <div className="teacher-material-card-stats student-progress-card-stats">
+                    <Link href={buildStudentMaterialHref({ groupId: card.id, progressStatus: "mastered" })}>掌握 {progress.masteredCount}</Link>
+                    <Link href={buildStudentMaterialHref({ groupId: card.id, progressStatus: "unmastered" })}>
+                      未掌握 {progress.unmasteredCount}
+                    </Link>
+                    <Link href={buildStudentMaterialHref({ groupId: card.id, progressStatus: "unlearned" })}>
+                      未学习 {progress.unlearnedCount}
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
       ) : (
         <section className="empty-state">当前分类暂无资料。</section>

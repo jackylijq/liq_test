@@ -64,7 +64,12 @@ export function getMeaningLines(termType: TermType | string, meanings: DisplayMe
 export function shouldShowExampleSentence(termType: TermType | string, termText: string, exampleSentence?: string | null) {
   const sentence = exampleSentence?.trim();
   if (!sentence) return false;
+  if (isPlaceholderExampleSentence(sentence)) return false;
   return !(termType === "sentence" && sentence === termText.trim());
+}
+
+export function isPlaceholderExampleSentence(sentence: string) {
+  return /^Please use ".+" in a simple sentence\.$/.test(sentence.trim());
 }
 
 export function shouldShowUsageContext(meaning: { usageContext?: string | null; fieldSourcesJson?: string | null }) {

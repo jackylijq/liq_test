@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { updateTeacherTermAction } from "./edit-actions";
+import { isPlaceholderExampleSentence } from "@/lib/terms/display";
 
 type EditableMeaning = {
   id: string;
@@ -112,7 +113,11 @@ export function TeacherTermEditDialog({ term, categoryOptions, rootGroupId, retu
                 </label>
                 <label>
                   示例句子
-                  <textarea name={`meaning-${index}-exampleSentence`} defaultValue={meaning.exampleSentence ?? ""} rows={2} />
+                  <textarea
+                    name={`meaning-${index}-exampleSentence`}
+                    defaultValue={meaning.exampleSentence && !isPlaceholderExampleSentence(meaning.exampleSentence) ? meaning.exampleSentence : ""}
+                    rows={2}
+                  />
                 </label>
                 <label>
                   解析

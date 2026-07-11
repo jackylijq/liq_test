@@ -199,6 +199,20 @@ select {
 
 .student-section-title {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.student-section-title span {
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .study-card {
@@ -499,6 +513,7 @@ select {
 }
 
 .teacher-material-card-stats span,
+.teacher-material-card-stats a,
 .teacher-material-detail-stats span {
   border: 1px solid #dde2ea;
   border-radius: 8px;
@@ -506,6 +521,11 @@ select {
   padding: 8px 10px;
   color: #475569;
   font-weight: 700;
+}
+
+.teacher-material-card-stats a:hover {
+  border-color: #2563eb;
+  color: #1d4ed8;
 }
 
 .teacher-sidebar {
@@ -773,6 +793,22 @@ select {
 .teacher-outline-panel {
   display: grid;
   gap: 10px;
+}
+
+.teacher-outline-summary-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacher-outline-summary-row .teacher-unit-tabs {
+  min-width: 0;
+}
+
+.teacher-outline-summary-row .teacher-material-detail-stats {
+  justify-content: flex-end;
+  flex: 0 1 520px;
 }
 
 .teacher-unit-tabs,
@@ -1198,6 +1234,15 @@ select {
 
   .teacher-header-actions {
     justify-content: flex-start;
+  }
+
+  .teacher-outline-summary-row {
+    flex-direction: column;
+  }
+
+  .teacher-outline-summary-row .teacher-material-detail-stats {
+    justify-content: flex-start;
+    flex-basis: auto;
   }
 
   .category-create-form,

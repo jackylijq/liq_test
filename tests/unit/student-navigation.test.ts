@@ -19,5 +19,8 @@ describe("buildStudentMaterialHref", () => {
   it("keeps student material tabs and opens card detail through the learning page", () => {
     expect(buildStudentMaterialHref({ tab: "junior" })).toBe("/learn?menu=word-learning&tab=junior");
     expect(buildStudentMaterialHref({ groupId: "grade-7" })).toBe("/learn?menu=word-learning&groupId=grade-7");
+    expect(buildStudentMaterialHref({ groupId: "grade-7", progressStatus: "unlearned" })).toBe(
+      "/learn?menu=word-learning&groupId=grade-7&progressStatus=unlearned",
+    );
   });
 });

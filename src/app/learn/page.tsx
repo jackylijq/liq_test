@@ -2,7 +2,7 @@ import Link from "next/link";
 import { updateLearningProgressAction } from "./actions";
 import { StudentMaterialsContent } from "./StudentMaterialsContent";
 import { prisma } from "@/lib/db";
-import { DEFAULT_STUDENT_USER_KEY, type LearningStatus } from "@/lib/learning/progress";
+import { DEFAULT_STUDENT_USER_KEY, normalizeLearningProgressFilter, type LearningStatus } from "@/lib/learning/progress";
 import { normalizeStudentMenu, studentMenus } from "@/lib/student/navigation";
 import {
   getTeacherContentOutline,
@@ -16,12 +16,13 @@ import { buildPronunciationAudioUrl } from "@/lib/terms/pronunciation";
 export const dynamic = "force-dynamic";
 
 type LearnPageProps = {
-  searchParams: Promise<{ menu?: string; tab?: string; groupId?: string; unitId?: string; categoryId?: string }>;
+  searchParams: Promise<{ menu?: string; tab?: string; groupId?: string; unitId?: string; categoryId?: string; progressStatus?: string }>;
 };
 
 export default async function LearnPage({ searchParams }: LearnPageProps) {
   const params = await searchParams;
   const activeMenu = normalizeStudentMenu(params.menu);
+  const progressFilter = normalizeLearningProgressFilter(params.progressStatus);
   const groups = await getTeacherGroups();
   const selectedGroup = params.groupId ? selectTeacherGroup(groups, params.groupId) : null;
   const outline = selectedGroup ? await getTeacherContentOutline(selectedGroup.id) : [];
@@ -40,6 +41,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
         })
       : [];
   const progressByTermId = new Map(progressRows.map((row) => [row.termId, row.status as LearningStatus]));
+  const visibleTerms = progressFilter ? terms.filter((term) => matchesProgressFilter(progressByTermId.get(term.id), progressFilter)) : terms;
   const contentTitle = selectedCategory?.name ?? selectedUnit?.name ?? selectedGroup?.name ?? "学习";
 
   return (
@@ -70,11 +72,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
               <section className="student-outline-panel" aria-label="学习内容筛选">
                 <nav className="teacher-unit-tabs" aria-label="学习单元筛选">
                   {outline.map((unit) => (
-                    <Link
-                      className={unit.id === selectedUnit?.id ? "active" : ""}
-                      href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${unit.id}`}
-                      key={unit.id}
-                    >
+                    <Link className={unit.id === selectedUnit?.id ? "active" : ""} href={buildLearnHref({ groupId: selectedGroup.id, unitId: unit.id, progressStatus: progressFilter })} key={unit.id}>
                       {unit.name}
                     </Link>
                   ))}
@@ -82,11 +80,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
                 {selectedUnit ? (
                   <nav className="teacher-filter-tabs" aria-label="学习小类筛选">
                     {selectedUnit.categories.map((category) => (
-                      <Link
-                        className={category.id === selectedCategory?.id ? "active" : ""}
-                        href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
-                        key={category.id}
-                      >
+                      <Link className={category.id === selectedCategory?.id ? "active" : ""} href={buildLearnHref({ groupId: selectedGroup.id, unitId: selectedUnit.id, categoryId: category.id, progressStatus: progressFilter })} key={category.id}>
                         {category.name}
                       </Link>
                     ))}
@@ -94,10 +88,13 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
                 ) : null}
               </section>
             ) : null}
-            <h2 className="student-section-title">{contentTitle}</h2>
-            {terms.length > 0 ? (
+            <h2 className="student-section-title">
+              {contentTitle}
+              {progressFilter ? <span>{formatProgressFilter(progressFilter)}</span> : null}
+            </h2>
+            {visibleTerms.length > 0 ? (
               <section className="study-list">
-                {terms.map((term) => {
+                {visibleTerms.map((term) => {
                   const meaning = term.meanings[0];
                   const learningStatus = progressByTermId.get(term.id);
                   const detailLines = getStudyDetailLines(term);
@@ -133,6 +130,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
                         activeStatus={learningStatus}
                         categoryId={params.categoryId}
                         groupId={params.groupId}
+                        progressStatus={progressFilter}
                         status="mastered"
                         termId={term.id}
                         unitId={params.unitId}
@@ -141,6 +139,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
                         activeStatus={learningStatus}
                         categoryId={params.categoryId}
                         groupId={params.groupId}
+                        progressStatus={progressFilter}
                         status="unmastered"
                         termId={term.id}
                         unitId={params.unitId}
@@ -152,7 +151,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
             ) : (
               <article className="study-card">
                 <h2>暂无词条</h2>
-                <p>请先到老师端导入学习内容。</p>
+                <p>{terms.length > 0 ? "当前学习状态下暂无内容。" : "请先到老师端导入学习内容。"}</p>
               </article>
             )}
           </>
@@ -180,6 +179,36 @@ function formatLearningStatus(status: LearningStatus) {
   return status === "mastered" ? "已掌握" : "未掌握";
 }
 
+function formatProgressFilter(status: "mastered" | "unmastered" | "unlearned") {
+  if (status === "mastered") return "掌握";
+  if (status === "unmastered") return "未掌握";
+  return "未学习";
+}
+
+function matchesProgressFilter(status: LearningStatus | undefined, filter: "mastered" | "unmastered" | "unlearned") {
+  if (filter === "unlearned") return !status;
+  return status === filter;
+}
+
+function buildLearnHref({
+  groupId,
+  unitId,
+  categoryId,
+  progressStatus,
+}: {
+  groupId?: string;
+  unitId?: string;
+  categoryId?: string;
+  progressStatus?: string;
+}) {
+  const searchParams = new URLSearchParams({ menu: "word-learning" });
+  if (groupId) searchParams.set("groupId", groupId);
+  if (unitId) searchParams.set("unitId", unitId);
+  if (categoryId) searchParams.set("categoryId", categoryId);
+  if (progressStatus) searchParams.set("progressStatus", progressStatus);
+  return `/learn?${searchParams.toString()}`;
+}
+
 function getStudyDetailLines(term: Awaited<ReturnType<typeof getTeacherGroupTerms>>[number]) {
   return [
     ...getMeaningLines(term.termType, term.meanings, term.text),
@@ -193,6 +222,7 @@ function LearningStatusForm({
   activeStatus,
   categoryId,
   groupId,
+  progressStatus,
   status,
   termId,
   unitId,
@@ -200,6 +230,7 @@ function LearningStatusForm({
   activeStatus?: LearningStatus;
   categoryId?: string;
   groupId?: string;
+  progressStatus?: string;
   status: LearningStatus;
   termId: string;
   unitId?: string;
@@ -212,6 +243,7 @@ function LearningStatusForm({
       {groupId ? <input name="groupId" type="hidden" value={groupId} /> : null}
       {unitId ? <input name="unitId" type="hidden" value={unitId} /> : null}
       {categoryId ? <input name="categoryId" type="hidden" value={categoryId} /> : null}
+      {progressStatus ? <input name="progressStatus" type="hidden" value={progressStatus} /> : null}
       <button
         aria-label={status === "mastered" ? "标记为掌握" : "标记为未掌握"}
         aria-pressed={isActive}
