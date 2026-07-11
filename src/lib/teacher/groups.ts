@@ -170,15 +170,16 @@ export async function getTeacherGroupScope(groupId: string): Promise<TeacherGrou
   const unit = group.parent?.parent ? group.parent : group.parent ? group : null;
   const category = group.parent?.parent ? group : null;
   const displayName = category ? formatTeacherCategoryName(category.name) : group.name;
-  const searchParams = new URLSearchParams({ groupId: root.id });
+  const searchParams = new URLSearchParams();
   if (unit) searchParams.set("unitId", unit.id);
   if (category) searchParams.set("categoryId", category.id);
+  const query = searchParams.toString();
 
   return {
     id: group.id,
     name: group.name,
     displayName,
-    teacherHref: `/teacher?${searchParams.toString()}`,
+    teacherHref: query ? `/teacher/materials/${root.id}?${query}` : `/teacher/materials/${root.id}`,
     rootGroupId: root.id,
     unitId: unit?.id,
     categoryId: category?.id,

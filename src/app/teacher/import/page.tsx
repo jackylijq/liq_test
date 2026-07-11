@@ -19,7 +19,7 @@ export default async function TeacherImportPage({ searchParams }: TeacherImportP
             <p className="eyebrow">目标分类</p>
             <h1>{selectedGroup?.name ?? "暂无分类"}</h1>
           </div>
-          <Link href={`/teacher${selectedGroup ? `?groupId=${selectedGroup.id}` : ""}`}>返回分类</Link>
+          <Link href={selectedGroup ? `/teacher/materials/${selectedGroup.id}` : "/teacher/materials"}>返回资料</Link>
         </div>
 
         {params.error === "empty-import" ? <p className="form-error">请先上传文件或填写导入内容。</p> : null}
@@ -36,7 +36,7 @@ export default async function TeacherImportPage({ searchParams }: TeacherImportP
             />
             <label htmlFor="content">粘贴 MD/TXT 导入内容</label>
             <textarea id="content" name="content" rows={10} />
-            <button type="submit">解析到当前分类</button>
+            <button type="submit">解析到当前资料</button>
           </form>
         ) : (
           <p className="empty-state">暂无分类，请先运行种子数据。</p>
