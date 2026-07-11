@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { updateLearningProgressAction } from "./actions";
+import { StudentMaterialsContent } from "./StudentMaterialsContent";
 import { prisma } from "@/lib/db";
 import { DEFAULT_STUDENT_USER_KEY, type LearningStatus } from "@/lib/learning/progress";
 import { normalizeStudentMenu, studentMenus } from "@/lib/student/navigation";
@@ -15,14 +16,14 @@ import { buildPronunciationAudioUrl } from "@/lib/terms/pronunciation";
 export const dynamic = "force-dynamic";
 
 type LearnPageProps = {
-  searchParams: Promise<{ menu?: string; groupId?: string; unitId?: string; categoryId?: string }>;
+  searchParams: Promise<{ menu?: string; tab?: string; groupId?: string; unitId?: string; categoryId?: string }>;
 };
 
 export default async function LearnPage({ searchParams }: LearnPageProps) {
   const params = await searchParams;
   const activeMenu = normalizeStudentMenu(params.menu);
   const groups = await getTeacherGroups();
-  const selectedGroup = selectTeacherGroup(groups, params.groupId);
+  const selectedGroup = params.groupId ? selectTeacherGroup(groups, params.groupId) : null;
   const outline = selectedGroup ? await getTeacherContentOutline(selectedGroup.id) : [];
   const selectedUnit = outline.find((unit) => unit.id === params.unitId || unit.categories.some((category) => category.id === params.categoryId));
   const selectedCategory = selectedUnit?.categories.find((category) => category.id === params.categoryId);
@@ -54,107 +55,109 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
         </nav>
       </aside>
       <section className="student-content">
-        <header className="student-workbench-header">
-          <div>
-            <p className="eyebrow">学生入口</p>
-            <h1>单词学习</h1>
-          </div>
-        </header>
-        <nav className="student-grade-links" aria-label="学习年级">
-          {groups.map((group) => (
-            <Link className={group.id === selectedGroup?.id ? "active" : ""} href={`/learn?menu=word-learning&groupId=${group.id}`} key={group.id}>
-              {group.name}
-            </Link>
-          ))}
-        </nav>
-        {selectedGroup && outline.length > 0 ? (
-          <section className="student-outline-panel" aria-label="学习内容筛选">
-            <nav className="teacher-unit-tabs" aria-label="学习单元筛选">
-              {outline.map((unit) => (
-                <Link
-                  className={unit.id === selectedUnit?.id ? "active" : ""}
-                  href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${unit.id}`}
-                  key={unit.id}
-                >
-                  {unit.name}
-                </Link>
-              ))}
-            </nav>
-            {selectedUnit ? (
-              <nav className="teacher-filter-tabs" aria-label="学习小类筛选">
-                {selectedUnit.categories.map((category) => (
-                  <Link
-                    className={category.id === selectedCategory?.id ? "active" : ""}
-                    href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
-                    key={category.id}
-                  >
-                    {category.name}
-                  </Link>
-                ))}
-              </nav>
+        {params.groupId ? (
+          <>
+            <header className="student-workbench-header">
+              <div>
+                <p className="eyebrow">单词学习</p>
+                <h1>{selectedGroup?.name ?? "学习"}</h1>
+              </div>
+              <Link className="secondary-link" href="/learn?menu=word-learning">
+                返回资料
+              </Link>
+            </header>
+            {selectedGroup && outline.length > 0 ? (
+              <section className="student-outline-panel" aria-label="学习内容筛选">
+                <nav className="teacher-unit-tabs" aria-label="学习单元筛选">
+                  {outline.map((unit) => (
+                    <Link
+                      className={unit.id === selectedUnit?.id ? "active" : ""}
+                      href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${unit.id}`}
+                      key={unit.id}
+                    >
+                      {unit.name}
+                    </Link>
+                  ))}
+                </nav>
+                {selectedUnit ? (
+                  <nav className="teacher-filter-tabs" aria-label="学习小类筛选">
+                    {selectedUnit.categories.map((category) => (
+                      <Link
+                        className={category.id === selectedCategory?.id ? "active" : ""}
+                        href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
+                        key={category.id}
+                      >
+                        {category.name}
+                      </Link>
+                    ))}
+                  </nav>
+                ) : null}
+              </section>
             ) : null}
-          </section>
-        ) : null}
-        <h2 className="student-section-title">{contentTitle}</h2>
-        {terms.length > 0 ? (
-          <section className="study-list">
-            {terms.map((term) => {
-              const meaning = term.meanings[0];
-              const learningStatus = progressByTermId.get(term.id);
-              const detailLines = getStudyDetailLines(term);
-              return (
-                <article className="study-card" key={term.id}>
-                  <div className="study-card-main">
-                    <h2>
-                      <span>{term.text}</span>
-                      {term.termType === "word" && term.phoneticSymbol ? <small>{term.phoneticSymbol}</small> : null}
-                    </h2>
-                    <p className="study-type-label">{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
-                    {learningStatus ? <p className={`study-status-label ${learningStatus}`}>{formatLearningStatus(learningStatus)}</p> : null}
-                    {term.termType === "word" ? (
-                      <audio aria-label={`${term.text} 发音`} controls preload="none" src={buildPronunciationAudioUrl(term.text)} />
-                    ) : null}
-                  </div>
-                  <details className="study-details">
-                    <summary className="study-icon-button study-toggle-button" title="展开/收起内容" aria-label="展开/收起内容">
-                      <span className="study-toggle-open">
-                        <EyeIcon />
-                      </span>
-                      <span className="study-toggle-close">
-                        <EyeOffIcon />
-                      </span>
-                    </summary>
-                    <div className="study-detail-body">
-                      {detailLines.map((line, index) => (
-                        <p key={`${term.id}-detail-${index}`}>{line}</p>
-                      ))}
-                    </div>
-                  </details>
-                  <LearningStatusForm
-                    activeStatus={learningStatus}
-                    categoryId={params.categoryId}
-                    groupId={params.groupId}
-                    status="mastered"
-                    termId={term.id}
-                    unitId={params.unitId}
-                  />
-                  <LearningStatusForm
-                    activeStatus={learningStatus}
-                    categoryId={params.categoryId}
-                    groupId={params.groupId}
-                    status="unmastered"
-                    termId={term.id}
-                    unitId={params.unitId}
-                  />
-                </article>
-              );
-            })}
-          </section>
+            <h2 className="student-section-title">{contentTitle}</h2>
+            {terms.length > 0 ? (
+              <section className="study-list">
+                {terms.map((term) => {
+                  const meaning = term.meanings[0];
+                  const learningStatus = progressByTermId.get(term.id);
+                  const detailLines = getStudyDetailLines(term);
+                  return (
+                    <article className="study-card" key={term.id}>
+                      <div className="study-card-main">
+                        <h2>
+                          <span>{term.text}</span>
+                          {term.termType === "word" && term.phoneticSymbol ? <small>{term.phoneticSymbol}</small> : null}
+                        </h2>
+                        <p className="study-type-label">{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
+                        {learningStatus ? <p className={`study-status-label ${learningStatus}`}>{formatLearningStatus(learningStatus)}</p> : null}
+                        {term.termType === "word" ? (
+                          <audio aria-label={`${term.text} 发音`} controls preload="none" src={buildPronunciationAudioUrl(term.text)} />
+                        ) : null}
+                      </div>
+                      <details className="study-details">
+                        <summary className="study-icon-button study-toggle-button" title="展开/收起内容" aria-label="展开/收起内容">
+                          <span className="study-toggle-open">
+                            <EyeIcon />
+                          </span>
+                          <span className="study-toggle-close">
+                            <EyeOffIcon />
+                          </span>
+                        </summary>
+                        <div className="study-detail-body">
+                          {detailLines.map((line, index) => (
+                            <p key={`${term.id}-detail-${index}`}>{line}</p>
+                          ))}
+                        </div>
+                      </details>
+                      <LearningStatusForm
+                        activeStatus={learningStatus}
+                        categoryId={params.categoryId}
+                        groupId={params.groupId}
+                        status="mastered"
+                        termId={term.id}
+                        unitId={params.unitId}
+                      />
+                      <LearningStatusForm
+                        activeStatus={learningStatus}
+                        categoryId={params.categoryId}
+                        groupId={params.groupId}
+                        status="unmastered"
+                        termId={term.id}
+                        unitId={params.unitId}
+                      />
+                    </article>
+                  );
+                })}
+              </section>
+            ) : (
+              <article className="study-card">
+                <h2>暂无词条</h2>
+                <p>请先到老师端导入学习内容。</p>
+              </article>
+            )}
+          </>
         ) : (
-          <article className="study-card">
-            <h2>暂无词条</h2>
-            <p>请先到老师端导入学习内容。</p>
-          </article>
+          <StudentMaterialsContent tab={params.tab} />
         )}
       </section>
       <nav className="bottom-nav" aria-label="学生底部导航">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { studentMenus, normalizeStudentMenu } from "@/lib/student/navigation";
+import { buildStudentMaterialHref, studentMenus, normalizeStudentMenu } from "@/lib/student/navigation";
 
 describe("studentMenus", () => {
   it("starts with word learning as the student entry menu", () => {
@@ -12,5 +12,12 @@ describe("normalizeStudentMenu", () => {
     expect(normalizeStudentMenu()).toBe("word-learning");
     expect(normalizeStudentMenu("bad")).toBe("word-learning");
     expect(normalizeStudentMenu("word-learning")).toBe("word-learning");
+  });
+});
+
+describe("buildStudentMaterialHref", () => {
+  it("keeps student material tabs and opens card detail through the learning page", () => {
+    expect(buildStudentMaterialHref({ tab: "junior" })).toBe("/learn?menu=word-learning&tab=junior");
+    expect(buildStudentMaterialHref({ groupId: "grade-7" })).toBe("/learn?menu=word-learning&groupId=grade-7");
   });
 });

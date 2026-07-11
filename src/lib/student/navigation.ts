@@ -8,3 +8,10 @@ export function normalizeStudentMenu(value?: string | null): StudentMenuId {
   if (value === "word-learning") return value;
   return "word-learning";
 }
+
+export function buildStudentMaterialHref({ tab, groupId }: { tab?: string; groupId?: string }) {
+  const searchParams = new URLSearchParams({ menu: "word-learning" });
+  if (tab) searchParams.set("tab", tab);
+  if (groupId) searchParams.set("groupId", groupId);
+  return `/learn?${searchParams.toString()}`;
+}
