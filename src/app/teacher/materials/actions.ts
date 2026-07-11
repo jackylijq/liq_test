@@ -9,7 +9,7 @@ export async function toggleTeacherMaterialFavoriteAction(formData: FormData) {
   const groupId = String(formData.get("groupId") ?? "").trim();
   const tab = normalizeTeacherMaterialTab(String(formData.get("tab") ?? ""));
   if (!groupId) {
-    redirect(`/teacher/materials?tab=${tab}`);
+    redirect(`/teacher?menu=materials&tab=${tab}`);
   }
 
   const existing = await prisma.teacherMaterialFavorite.findUnique({
@@ -34,5 +34,5 @@ export async function toggleTeacherMaterialFavoriteAction(formData: FormData) {
 
   revalidatePath("/teacher");
   revalidatePath("/teacher/materials");
-  redirect(`/teacher/materials?tab=${tab}`);
+  redirect(`/teacher?menu=materials&tab=${tab}`);
 }

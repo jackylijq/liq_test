@@ -38,7 +38,7 @@ export async function parseImportAction(formData: FormData) {
   });
 
   if (parsed.length === 0) {
-    redirect(`/teacher/materials/${targetGroup.id}?error=empty-import`);
+    redirect(`/teacher?menu=materials&groupId=${targetGroup.id}&error=empty-import`);
   }
 
   const browserUsagePlan = parsedImport.mode === "source" ? buildBrowserUsagePlan(parsed) : [];
@@ -200,7 +200,7 @@ export async function confirmImportAction(formData: FormData) {
     include: { rows: { orderBy: { rowIndex: "asc" } } },
   });
   if (!batch) {
-    redirect("/teacher/library");
+    redirect("/teacher?menu=materials");
   }
 
   const startedAt = Date.now();
@@ -267,7 +267,7 @@ export async function confirmImportAction(formData: FormData) {
     rowCount: batch.rows.length,
     durationMs: Date.now() - startedAt,
   });
-  redirect(`/teacher/materials/${batch.targetGroupId}?importBatchId=${batch.id}`);
+  redirect(`/teacher?menu=materials&groupId=${batch.targetGroupId}&importBatchId=${batch.id}`);
 }
 
 async function getRootGroupId(client: DbClient, groupId: string) {

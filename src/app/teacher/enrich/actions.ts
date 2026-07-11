@@ -21,7 +21,7 @@ export async function enrichTeacherTermsAction(formData: FormData) {
     selectedIds,
   });
 
-  if (!targetGroupId) redirect("/teacher/materials");
+  if (!targetGroupId) redirect("/teacher?menu=materials");
   if (mode !== "all" && selectedIds.length === 0) redirect(`/teacher/enrich?groupId=${targetGroupId}&error=empty-selection`);
 
   const terms = await getTermsForEnrichment(targetGroupId, mode === "all" ? undefined : selectedIds);
@@ -66,7 +66,7 @@ export async function enrichTeacherTermsAction(formData: FormData) {
   }
 
   const scope = await getTeacherGroupScope(targetGroupId);
-  redirect(scope?.teacherHref ?? `/teacher/materials/${targetGroupId}`);
+  redirect(scope?.teacherHref ?? `/teacher?menu=materials&groupId=${targetGroupId}`);
 }
 
 function debugDbTerm(term: DbTerm) {

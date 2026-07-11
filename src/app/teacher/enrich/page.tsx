@@ -29,7 +29,7 @@ export default async function TeacherEnrichPage({ searchParams }: TeacherEnrichP
             <p className="eyebrow">补齐分类</p>
             <h1>{selectedScope?.displayName ?? "暂无分类"}</h1>
           </div>
-          <Link href={selectedScope?.teacherHref ?? "/teacher/materials"}>返回资料</Link>
+          <Link href={selectedScope?.teacherHref ?? "/teacher?menu=materials"}>返回资料</Link>
         </div>
 
         {params.error === "empty-selection" ? <p className="form-error">请至少勾选一条需要补齐的内容。</p> : null}

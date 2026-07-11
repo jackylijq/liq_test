@@ -179,7 +179,7 @@ export async function getTeacherGroupScope(groupId: string): Promise<TeacherGrou
     id: group.id,
     name: group.name,
     displayName,
-    teacherHref: query ? `/teacher/materials/${root.id}?${query}` : `/teacher/materials/${root.id}`,
+    teacherHref: query ? `/teacher?menu=materials&groupId=${root.id}&${query}` : `/teacher?menu=materials&groupId=${root.id}`,
     rootGroupId: root.id,
     unitId: unit?.id,
     categoryId: category?.id,

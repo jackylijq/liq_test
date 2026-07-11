@@ -25,7 +25,7 @@ export default async function ImportPreviewPage({ params }: { params: Promise<{ 
         <input type="hidden" name="batchId" value={batchId} />
         <button type="submit">确认导入</button>
       </form>
-      {batch ? <Link href={`/teacher/materials/${batch.targetGroupId}`}>返回当前资料</Link> : null}
+      {batch ? <Link href={`/teacher?menu=materials&groupId=${batch.targetGroupId}`}>返回当前资料</Link> : null}
     </main>
   );
 }

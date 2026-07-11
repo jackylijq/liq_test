@@ -19,7 +19,7 @@ export default async function TeacherImportPage({ searchParams }: TeacherImportP
             <p className="eyebrow">目标分类</p>
             <h1>{selectedGroup?.name ?? "暂无分类"}</h1>
           </div>
-          <Link href={selectedGroup ? `/teacher/materials/${selectedGroup.id}` : "/teacher/materials"}>返回资料</Link>
+          <Link href={selectedGroup ? `/teacher?menu=materials&groupId=${selectedGroup.id}` : "/teacher?menu=materials"}>返回资料</Link>
         </div>
 
         {params.error === "empty-import" ? <p className="form-error">请先上传文件或填写导入内容。</p> : null}
