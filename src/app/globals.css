@@ -125,8 +125,33 @@ select {
   padding: 20px;
 }
 
-.student-grade-links {
+.group-sidebar h1 {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.student-menu-links {
   display: grid;
+  gap: 8px;
+}
+
+.student-menu-links a {
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.student-menu-links a.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.student-grade-links {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -135,6 +160,8 @@ select {
   border-radius: 8px;
   background: #fff;
   padding: 10px 12px;
+  color: #475569;
+  font-weight: 700;
 }
 
 .student-grade-links a.active {
@@ -147,6 +174,21 @@ select {
 .student-content {
   min-width: 0;
   padding: 20px;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.student-workbench-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.student-workbench-header h1,
+.student-workbench-header p {
+  margin: 0;
 }
 
 .student-outline-panel,
@@ -156,7 +198,7 @@ select {
 }
 
 .student-section-title {
-  margin: 14px 0 0;
+  margin: 0;
 }
 
 .study-card {

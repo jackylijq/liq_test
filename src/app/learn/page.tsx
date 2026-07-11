@@ -2,6 +2,7 @@ import Link from "next/link";
 import { updateLearningProgressAction } from "./actions";
 import { prisma } from "@/lib/db";
 import { DEFAULT_STUDENT_USER_KEY, type LearningStatus } from "@/lib/learning/progress";
+import { normalizeStudentMenu, studentMenus } from "@/lib/student/navigation";
 import {
   getTeacherContentOutline,
   getTeacherGroups,
@@ -14,11 +15,12 @@ import { buildPronunciationAudioUrl } from "@/lib/terms/pronunciation";
 export const dynamic = "force-dynamic";
 
 type LearnPageProps = {
-  searchParams: Promise<{ groupId?: string; unitId?: string; categoryId?: string }>;
+  searchParams: Promise<{ menu?: string; groupId?: string; unitId?: string; categoryId?: string }>;
 };
 
 export default async function LearnPage({ searchParams }: LearnPageProps) {
   const params = await searchParams;
+  const activeMenu = normalizeStudentMenu(params.menu);
   const groups = await getTeacherGroups();
   const selectedGroup = selectTeacherGroup(groups, params.groupId);
   const outline = selectedGroup ? await getTeacherContentOutline(selectedGroup.id) : [];
@@ -42,23 +44,36 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
   return (
     <main className="student-layout learn-scroll">
       <aside className="group-sidebar">
-        <nav className="student-grade-links" aria-label="学习年级">
-          {groups.map((group) => (
-            <Link className={group.id === selectedGroup?.id ? "active" : ""} href={`/learn?groupId=${group.id}`} key={group.id}>
-              {group.name}
+        <h1>学生工作台</h1>
+        <nav className="student-menu-links" aria-label="学生菜单">
+          {studentMenus.map((menu) => (
+            <Link className={menu.id === activeMenu ? "active" : ""} href={menu.href} key={menu.id}>
+              {menu.label}
             </Link>
           ))}
         </nav>
       </aside>
       <section className="student-content">
-        <h1>学习</h1>
+        <header className="student-workbench-header">
+          <div>
+            <p className="eyebrow">学生入口</p>
+            <h1>单词学习</h1>
+          </div>
+        </header>
+        <nav className="student-grade-links" aria-label="学习年级">
+          {groups.map((group) => (
+            <Link className={group.id === selectedGroup?.id ? "active" : ""} href={`/learn?menu=word-learning&groupId=${group.id}`} key={group.id}>
+              {group.name}
+            </Link>
+          ))}
+        </nav>
         {selectedGroup && outline.length > 0 ? (
           <section className="student-outline-panel" aria-label="学习内容筛选">
             <nav className="teacher-unit-tabs" aria-label="学习单元筛选">
               {outline.map((unit) => (
                 <Link
                   className={unit.id === selectedUnit?.id ? "active" : ""}
-                  href={`/learn?groupId=${selectedGroup.id}&unitId=${unit.id}`}
+                  href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${unit.id}`}
                   key={unit.id}
                 >
                   {unit.name}
@@ -70,7 +85,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
                 {selectedUnit.categories.map((category) => (
                   <Link
                     className={category.id === selectedCategory?.id ? "active" : ""}
-                    href={`/learn?groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
+                    href={`/learn?menu=word-learning&groupId=${selectedGroup.id}&unitId=${selectedUnit.id}&categoryId=${category.id}`}
                     key={category.id}
                   >
                     {category.name}
