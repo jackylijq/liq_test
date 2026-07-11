@@ -27,7 +27,7 @@ export function normalizeTeacherMaterialTab(value?: string | null): MaterialTab 
   if (value === "favorite" || value === "all" || value === "primary" || value === "junior" || value === "other") {
     return value;
   }
-  return "all";
+  return "favorite";
 }
 
 export function getTeacherMaterialCover(name: string) {

@@ -31,8 +31,9 @@ describe("filterTeacherMaterialGroups", () => {
 });
 
 describe("normalizeTeacherMaterialTab", () => {
-  it("falls back to all for unknown tabs", () => {
-    expect(normalizeTeacherMaterialTab("bad")).toBe("all");
+  it("falls back to favorite for missing or unknown tabs", () => {
+    expect(normalizeTeacherMaterialTab()).toBe("favorite");
+    expect(normalizeTeacherMaterialTab("bad")).toBe("favorite");
     expect(normalizeTeacherMaterialTab("favorite")).toBe("favorite");
   });
 });
