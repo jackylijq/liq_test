@@ -152,7 +152,7 @@ select {
 .student-outline-panel,
 .study-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .student-section-title {
@@ -163,10 +163,10 @@ select {
   background: #fff;
   border: 1px solid #dde2ea;
   border-radius: 8px;
-  padding: 18px;
+  padding: 14px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) repeat(3, 38px);
-  gap: 10px;
+  gap: 8px;
   align-items: start;
 }
 
@@ -179,7 +179,11 @@ select {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  font-size: 21px;
+  line-height: 1.25;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .study-card h2 small {
@@ -195,8 +199,21 @@ select {
 
 .study-card-main {
   min-width: 0;
-  display: grid;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.study-type-label {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .study-status-label {
@@ -205,6 +222,7 @@ select {
   padding: 4px 8px;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .study-status-label.mastered {
@@ -620,11 +638,12 @@ select {
   }
 
   .study-card {
-    padding: 14px;
+    padding: 12px;
+    grid-template-columns: minmax(0, 1fr) repeat(3, 36px);
   }
 
-  .study-card {
-    grid-template-columns: minmax(0, 1fr) repeat(3, 36px);
+  .study-card h2 {
+    font-size: 18px;
   }
 
   .study-icon-button {

@@ -94,7 +94,7 @@ export default async function LearnPage({ searchParams }: LearnPageProps) {
                       <span>{term.text}</span>
                       {term.termType === "word" && term.phoneticSymbol ? <small>{term.phoneticSymbol}</small> : null}
                     </h2>
-                    <p>{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
+                    <p className="study-type-label">{formatStudyType(term.termType, meaning?.partOfSpeech)}</p>
                     {learningStatus ? <p className={`study-status-label ${learningStatus}`}>{formatLearningStatus(learningStatus)}</p> : null}
                     {term.termType === "word" ? (
                       <audio aria-label={`${term.text} 发音`} controls preload="none" src={buildPronunciationAudioUrl(term.text)} />
